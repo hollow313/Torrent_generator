@@ -45,19 +45,42 @@ class QBittorrentClient:
                 # Accès direct sans authentification autorisé
                 return client
 
+            # Si l'IP est bannie par qBittorrent
+            if "bannie" in test_resp.text.lower() or "banned" in test_resp.text.lower():
+                await client.aclose()
+                raise PermissionError(
+                    "Votre adresse IP a été temporairement bannie par qBittorrent suite à des tentatives infructueuses. "
+                    "Redémarrez simplement votre conteneur qBittorrent sur TrueNAS pour réinitialiser le blocage immédiatement."
+                )
+
             # 2. Si une authentification est requise (HTTP 403 Forbidden ou redirection)
+            # IMPORTANT: Si aucun identifiant n'est fourni, NE PAS poster d'identifiants vides !
+            # Cela évite d'incrémenter le compteur d'échecs de qBittorrent et de provoquer un ban.
+            if not self.username and not self.password:
+                await client.aclose()
+                raise PermissionError(
+                    "qBittorrent exige une authentification pour ce conteneur (le conteneur a une IP interne Docker distincte de votre réseau local). "
+                    "Veuillez renseigner votre nom d'utilisateur et mot de passe qBittorrent dans les paramètres, "
+                    "ou ajouter le sous-réseau Docker (ex: 172.16.0.0/12) dans les sous-réseaux approuvés de qBittorrent."
+                )
+
             login_url = f"{self.base_url}/api/v2/auth/login"
             data = {
-                "username": self.username or "",
-                "password": self.password or ""
+                "username": self.username,
+                "password": self.password
             }
             resp = await client.post(login_url, data=data)
             if resp.status_code == 200 and "Fails" not in resp.text:
                 return client
 
             await client.aclose()
+            if "bannie" in resp.text.lower() or "banned" in resp.text.lower():
+                raise PermissionError(
+                    "Votre adresse IP a été temporairement bannie par qBittorrent suite à trop de tentatives. "
+                    "Redémarrez le conteneur qBittorrent sur votre serveur pour lever le blocage."
+                )
             error_msg = resp.text.strip() if resp.text else f"Code HTTP {resp.status_code}"
-            raise PermissionError(f"qBittorrent requiert une authentification valide ({error_msg}).")
+            raise PermissionError(f"Identifiants qBittorrent refusés ({error_msg}).")
         except Exception as e:
             await client.aclose()
             raise e
