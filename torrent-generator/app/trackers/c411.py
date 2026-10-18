@@ -192,6 +192,78 @@ class C411Tracker(BaseTracker):
             print(f"[C411 search] Exception during search: {e}")
             return []
 
+    async def check_duplicates(
+        self,
+        title: str,
+        resolution: str = "",
+        source: str = "",
+        tag: str = "",
+        category_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Deep duplicate analysis on C411.
+        Compares core title, resolution, source, and team tag to determine upload eligibility.
+        """
+        import re
+        clean = title.replace(".", " ")
+        year_match = re.search(r"\b(19\d\d|20\d\d)\b", clean)
+        year = year_match.group(1) if year_match else ""
+        if year:
+            core_words = clean.split(year)[0].strip() + f" {year}"
+        else:
+            core_words = clean.split()[0] if clean.split() else clean
+
+        results = await self.search(core_words, category_id=category_id)
+        if not results:
+            return {
+                "can_upload": True,
+                "level": "success",
+                "badge": "AUCUN DOUBLON",
+                "status_text": "Aucun doublon trouvé sur C411. Vous pouvez uploader en toute confiance !",
+                "exact_duplicates": [],
+                "other_versions": [],
+                "total_found": 0
+            }
+
+        exact_dupes = []
+        other_versions = []
+
+        res_lower = resolution.lower() if resolution else ""
+        src_lower = source.lower() if source else ""
+        tag_lower = tag.lower().lstrip("-") if tag else ""
+
+        for item in results:
+            item_title_lower = item["title"].lower()
+            tag_match = tag_lower and tag_lower != "notag" and f"-{tag_lower}" in item_title_lower
+            res_match = bool(res_lower and res_lower in item_title_lower)
+            src_match = bool(src_lower and src_lower in item_title_lower)
+
+            if (res_match and src_match) or tag_match:
+                exact_dupes.append(item)
+            else:
+                other_versions.append(item)
+
+        if exact_dupes:
+            return {
+                "can_upload": False,
+                "level": "danger",
+                "badge": "DOUBLON STRICT DÉTECTÉ",
+                "status_text": f"⚠️ {len(exact_dupes)} release(s) avec la même qualité/source ou même team existent déjà sur C411. Risque élevé de refus par la Team Pending.",
+                "exact_duplicates": exact_dupes,
+                "other_versions": other_versions,
+                "total_found": len(results)
+            }
+        else:
+            return {
+                "can_upload": True,
+                "level": "warning",
+                "badge": "VERSION DISTINCTE AUTORISÉE",
+                "status_text": f"ℹ️ {len(other_versions)} version(s) trouvée(s) sur C411 mais dans une qualité ou source différente. Votre upload apporte une version distincte et est autorisé !",
+                "exact_duplicates": [],
+                "other_versions": other_versions,
+                "total_found": len(results)
+            }
+
     async def upload(
         self,
         torrent_path: str,

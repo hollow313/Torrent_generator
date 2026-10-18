@@ -265,13 +265,47 @@ async function selectAndAnalyze(filePath) {
         const cleanNameGuess = media.file_name.replace(/\b(19\d\d|20\d\d)\b.*$/, "").replace(/[\._\-]/g, " ").trim();
         document.getElementById("tmdb-search-input").value = cleanNameGuess;
 
+        // Sub-items handling (Episodes in folder or Manga tomes)
+        const subItemsCard = document.getElementById("sub-items-card");
+        const subItemsList = document.getElementById("sub-items-list");
+        if (media.sub_items && media.sub_items.length > 1) {
+            document.getElementById("sub-items-count").textContent = media.sub_items.length;
+            subItemsList.innerHTML = "";
+            media.sub_items.forEach(si => {
+                const tr = document.createElement("tr");
+                tr.innerHTML = `
+                    <td class="font-mono text-xs"><i class="fa-solid fa-file-video text-primary mr-1"></i> ${escapeHtml(si.name)}</td>
+                    <td class="text-xs">${si.size}</td>
+                    <td style="text-align: right;">
+                        <button class="btn btn-outline btn-xs" onclick="selectAndAnalyze('${si.path}', 'episode');">
+                            <i class="fa-solid fa-play mr-1"></i> Épisode seul
+                        </button>
+                    </td>
+                `;
+                subItemsList.appendChild(tr);
+            });
+            subItemsCard.style.display = "block";
+            
+            // Auto switch mode to pack if analyzing a directory
+            if (media.is_dir) {
+                const lower = filePath.toLowerCase();
+                if (lower.includes("manga") || lower.includes("scan") || lower.includes("ebook")) {
+                    document.getElementById("select-release-mode").value = "manga_pack";
+                } else {
+                    document.getElementById("select-release-mode").value = "season_pack";
+                }
+            }
+        } else {
+            subItemsCard.style.display = "none";
+        }
+
         // Populate Editors
         document.getElementById("editor-nfo").value = data.nfo;
         document.getElementById("editor-bbcode").value = data.bbcode;
 
         showToast("Média analysé avec succès selon les standards C411 !", "success");
 
-        // Auto duplicate check prompt
+        // Auto duplicate check with smart quality & tag comparison
         checkDuplicatesC411(namer.title);
 
     } catch (e) {
@@ -283,6 +317,7 @@ function initGenerator() {
     // Recalculate title when fields change
     document.getElementById("btn-recalc-title").addEventListener("click", () => {
         if (!currentAnalysis) return;
+        const mode = document.getElementById("select-release-mode").value;
         const year = document.getElementById("input-year").value.trim();
         const lang = document.getElementById("input-lang-tag").value.trim();
         const source = document.getElementById("select-source").value;
@@ -294,7 +329,20 @@ function initGenerator() {
         let titlePart = raw.replace(/\b(19\d\d|20\d\d)\b.*$/, "").replace(/[\s_\-]+/g, ".").replace(/[^\w\.]/g, "").trim(".");
 
         const parts = [titlePart];
-        if (year) parts.push(year);
+        if (mode === "episode") {
+            const seMatch = raw.match(/\b(S\d\dE\d\d)\b/i);
+            if (year) parts.push(year);
+            parts.push(seMatch ? seMatch[1].toUpperCase() : "S01E01");
+        } else if (mode === "season_pack") {
+            const sMatch = raw.match(/\b(S\d\d)\b/i);
+            parts.push(sMatch ? sMatch[1].toUpperCase() : "S01");
+        } else if (mode === "integrale") {
+            if (year) parts.push(year);
+            parts.push("INTEGRALE");
+        } else if (year) {
+            parts.push(year);
+        }
+
         if (lang) parts.push(lang);
         if (currentAnalysis.media_info.resolution && currentAnalysis.media_info.resolution !== "Autre") parts.push(currentAnalysis.media_info.resolution);
         if (source) parts.push(source);
@@ -303,6 +351,28 @@ function initGenerator() {
         const newTitle = parts.join(".") + `-${tag || 'NOTAG'}`;
         document.getElementById("input-release-title").value = newTitle;
         showToast("Titre réactualisé !", "info");
+    });
+
+    // Mode Selector change
+    document.getElementById("select-release-mode").addEventListener("change", (e) => {
+        const mode = e.target.value;
+        const badge = document.getElementById("badge-pack-mode");
+        const labels = {
+            single: "FILM / UNIQUE",
+            season_pack: "PACK SAISON",
+            episode: "ÉPISODE SEUL",
+            integrale: "INTÉGRALE",
+            manga_pack: "PACK MANGA"
+        };
+        badge.textContent = labels[mode] || mode.toUpperCase();
+
+        if (mode === "season_pack" || mode === "episode" || mode === "integrale") {
+            document.getElementById("select-category").value = "5000";
+        } else if (mode === "manga_pack") {
+            document.getElementById("select-category").value = "7030";
+        }
+
+        document.getElementById("btn-recalc-title").click();
     });
 
     // Check duplicate on C411 button
@@ -458,41 +528,78 @@ function initGenerator() {
     });
 }
 
-// C411 Duplicate Search
+// C411 Deep Duplicate Check (Quality, Source & Tag)
 async function checkDuplicatesC411(releaseTitle) {
     const resBox = document.getElementById("duplicate-results");
-    resBox.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-2"></i> Recherche sur C411 en cours...`;
+    resBox.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-2"></i> Analyse approfondie des doublons sur C411 (qualité, source, team)...`;
 
-    // Extract core words for search query
-    const words = releaseTitle.split(".")[0];
-    const yearMatch = releaseTitle.match(/\b(19\d\d|20\d\d)\b/);
-    const query = yearMatch ? `${words} ${yearMatch[0]}` : words;
+    const resolution = currentAnalysis ? currentAnalysis.media_info.resolution : "";
+    const source = document.getElementById("select-source").value;
+    const tag = document.getElementById("input-team-tag").value.trim();
+    const categoryId = document.getElementById("select-category").value;
 
     try {
-        const res = await fetch("/api/search-c411", {
+        const res = await fetch("/api/check-duplicates", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ query: query })
+            body: JSON.stringify({
+                title: releaseTitle,
+                resolution: resolution,
+                source: source,
+                tag: tag,
+                category_id: categoryId
+            })
         });
         const data = await res.json();
 
-        if (data.results && data.results.length > 0) {
-            let html = `<div class="mb-2 text-warning"><i class="fa-solid fa-triangle-exclamation mr-1"></i> <strong>${data.results.length} release(s) similaire(s) trouvée(s) sur C411 :</strong></div><ul class="text-xs" style="max-height: 120px; overflow-y: auto;">`;
-            data.results.slice(0, 5).forEach(item => {
+        let badgeClass = "badge-success";
+        let icon = "fa-circle-check";
+        if (data.level === "danger") {
+            badgeClass = "badge-danger";
+            icon = "fa-circle-xmark";
+        } else if (data.level === "warning") {
+            badgeClass = "badge-warning";
+            icon = "fa-triangle-exclamation";
+        }
+
+        let html = `
+            <div class="mb-2 flex items-center justify-between">
+                <span class="badge ${badgeClass}"><i class="fa-solid ${icon} mr-1"></i> ${data.badge}</span>
+                <span class="text-xs text-muted">${data.total_found} torrent(s) trouvés</span>
+            </div>
+            <p class="text-xs mb-2 font-medium">${escapeHtml(data.status_text)}</p>
+        `;
+
+        if (data.exact_duplicates && data.exact_duplicates.length > 0) {
+            html += `<div class="text-danger font-bold text-xs mb-1">🚨 Doublons stricts détectés :</div><ul class="text-xs mb-2" style="max-height: 100px; overflow-y: auto;">`;
+            data.exact_duplicates.forEach(item => {
                 html += `
-                    <li class="py-1 border-b border-dark flex justify-between items-center">
+                    <li class="py-1 border-b border-dark flex justify-between items-center text-danger">
                         <span class="truncate mr-2" style="max-width: 250px;">${escapeHtml(item.title)}</span>
-                        <span><strong class="text-success">${item.seeders}S</strong> / ${item.size}</span>
+                        <span><strong>${item.seeders}S</strong> / ${item.size}</span>
                     </li>
                 `;
             });
-            html += `</ul><div class="mt-2 text-muted">Vérifiez que votre version n'est pas un doublon strict avant de publier.</div>`;
-            resBox.innerHTML = html;
-        } else {
-            resBox.innerHTML = `<div class="text-success"><i class="fa-solid fa-circle-check mr-1"></i> Aucun doublon direct trouvé sur C411 avec la recherche "${escapeHtml(query)}". Parfait pour un nouvel upload !</div>`;
+            html += `</ul>`;
         }
+
+        if (data.other_versions && data.other_versions.length > 0) {
+            html += `<div class="text-muted text-xs mb-1">📁 Autres versions sur le site (qualité/source différente) :</div><ul class="text-xs" style="max-height: 80px; overflow-y: auto;">`;
+            data.other_versions.slice(0, 4).forEach(item => {
+                html += `
+                    <li class="py-1 border-b border-dark flex justify-between items-center text-muted">
+                        <span class="truncate mr-2" style="max-width: 250px;">${escapeHtml(item.title)}</span>
+                        <span>${item.seeders}S / ${item.size}</span>
+                    </li>
+                `;
+            });
+            html += `</ul>`;
+        }
+
+        resBox.innerHTML = html;
+
     } catch (e) {
-        resBox.innerHTML = `<span class="text-muted">Recherche non disponible (Vérifiez la clé API C411 dans Paramètres).</span>`;
+        resBox.innerHTML = `<span class="text-muted"><i class="fa-solid fa-circle-exclamation mr-1"></i> Vérification non disponible (Vérifiez la clé API C411 dans Paramètres).</span>`;
     }
 }
 

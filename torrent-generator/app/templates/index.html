@@ -165,6 +165,20 @@
                             </div>
                             <div class="card-body">
                                 <div class="form-group mb-3">
+                                    <label class="form-label flex justify-between">
+                                        <span>Mode de Publication (Séries & Mangas)</span>
+                                        <span class="badge badge-info" id="badge-pack-mode">FILM / UNIQUE</span>
+                                    </label>
+                                    <select id="select-release-mode" class="input">
+                                        <option value="single">🎬 Film / Média Unique</option>
+                                        <option value="season_pack">📺 Saison Complète (Pack - 1 torrent)</option>
+                                        <option value="episode">🎞️ Épisode Individuel</option>
+                                        <option value="integrale">📦 Intégrale Série (Toutes saisons)</option>
+                                        <option value="manga_pack">📚 Manga / Pack Tomes (T01 à TXX)</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group mb-3">
                                     <label for="input-release-title" class="form-label flex justify-between">
                                         <span>Titre officiel du Torrent (avec points)</span>
                                         <span class="badge badge-success" id="badge-tag-status">TAG CONSERVÉ</span>
@@ -205,10 +219,11 @@
                                     </div>
                                 </div>
 
-                                <div class="mt-3">
+                                <div class="mt-3 flex justify-between items-center">
                                     <button class="btn btn-secondary btn-sm" id="btn-recalc-title">
                                         <i class="fa-solid fa-arrows-rotate mr-1"></i> Réactualiser le nom
                                     </button>
+                                    <small class="text-dim text-xs">💡 Tag inspecté dans les métadonnées internes MKV</small>
                                 </div>
                             </div>
                         </div>
@@ -284,6 +299,28 @@
                         </div>
                         <div class="card-body">
                             <div class="grid-tmdb-cards" id="tmdb-cards-list"></div>
+                        </div>
+                    </div>
+
+                    <!-- Multi-files / Sub-items card (Series Episodes or Manga Tomes) -->
+                    <div id="sub-items-card" class="card mb-4 border-primary" style="display: none;">
+                        <div class="card-header flex justify-between items-center">
+                            <h4><i class="fa-solid fa-list-ol mr-2 text-primary"></i> Épisodes / Tomes Détectés (<span id="sub-items-count">0</span>)</h4>
+                            <span class="text-xs text-muted">Ce dossier contient plusieurs fichiers média. Vous pouvez créer un Pack complet (1 seul torrent) ou traiter un fichier individuel :</span>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-container" style="max-height: 220px; overflow-y: auto;">
+                                <table class="table">
+                                    <thead>
+                                        <tr>
+                                            <th>Fichier</th>
+                                            <th>Taille</th>
+                                            <th style="text-align: right;">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="sub-items-list"></tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
 

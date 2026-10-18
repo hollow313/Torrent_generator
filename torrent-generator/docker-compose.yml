@@ -3,6 +3,7 @@ services:
     image: hollow313/torrent-generator:latest
     container_name: torrent-generator
     restart: unless-stopped
+    user: "568:568"
     ports:
       - "30017:30017"
     environment:

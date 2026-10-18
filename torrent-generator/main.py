@@ -79,6 +79,14 @@ class ConfigUpdateModel(BaseModel):
 
 class AnalyzeRequest(BaseModel):
     path: str
+    release_mode: Optional[str] = "single"  # single, episode, season_pack, integrale, manga_pack
+
+class CheckDuplicatesRequest(BaseModel):
+    title: str
+    resolution: Optional[str] = ""
+    source: Optional[str] = ""
+    tag: Optional[str] = ""
+    category_id: Optional[str] = None
 
 class GenerateRequest(BaseModel):
     source_path: str
@@ -215,7 +223,7 @@ async def analyze_file(req: AnalyzeRequest):
     
     # 2. Release name formatting according to C411 standards
     raw_name = os.path.basename(req.path)
-    namer_res = ReleaseNamer.format_c411_title(raw_name, media_info)
+    namer_res = ReleaseNamer.format_c411_title(raw_name, media_info, release_mode=req.release_mode or "single")
 
     # 3. Piece size calculation
     total_bytes = media_info.get("file_size", 0)
@@ -337,6 +345,19 @@ async def search_c411(req: SearchC411Request):
         "count": len(results),
         "results": results
     }
+
+@app.post("/api/check-duplicates")
+async def check_duplicates(req: CheckDuplicatesRequest):
+    cfg = get_config()
+    tracker = C411Tracker(api_key=cfg.c411_api_key, base_url=cfg.c411_base_url, passkey=cfg.c411_passkey)
+    res = await tracker.check_duplicates(
+        title=req.title,
+        resolution=req.resolution or "",
+        source=req.source or "",
+        tag=req.tag or "",
+        category_id=req.category_id
+    )
+    return res
 
 @app.post("/api/upload-c411")
 async def upload_c411(req: UploadC411Request):

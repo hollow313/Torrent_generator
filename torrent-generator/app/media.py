@@ -214,6 +214,55 @@ class MediaAnalyzer:
 
         total_bytes = int(general.get("FileSize", 0) or os.path.getsize(file_path))
 
+        # Extract embedded metadata (Crucial when Radarr / Sonarr renamed files)
+        embedded_title = general.get("Title") or general.get("Movie_Name") or (videos[0].get("Title") if videos else "") or ""
+        parent_dir = os.path.dirname(os.path.abspath(file_path))
+        parent_folder = os.path.basename(parent_dir)
+
+        # Check for companion .nfo file in directory
+        companion_nfo_tag = None
+        companion_nfo_content = ""
+        try:
+            if os.path.exists(parent_dir):
+                for f in os.listdir(parent_dir):
+                    if f.lower().endswith(".nfo") and not f.startswith("."):
+                        nfo_p = os.path.join(parent_dir, f)
+                        with open(nfo_p, "r", encoding="utf-8", errors="ignore") as nfo_f:
+                            companion_nfo_content = nfo_f.read(4096)
+                            # Look for team signature like "Release : TEAM" or "-TEAM"
+                            import re
+                            match = re.search(r"(?:Release|Team|Group|Encodeur)\s*[:=]\s*([A-Za-z0-9_-]+)", companion_nfo_content, re.IGNORECASE)
+                            if match:
+                                companion_nfo_tag = match.group(1).strip()
+                            else:
+                                match2 = re.search(r"-([A-Za-z0-9_]{2,15})(?:\.[a-zA-Z0-9]+)?\s*$", companion_nfo_content, re.MULTILINE)
+                                if match2:
+                                    companion_nfo_tag = match2.group(1).strip()
+                        break
+        except Exception as e:
+            print(f"[MediaAnalyzer] Companion NFO check error: {e}")
+
+        # Scan folder for sub-items (episodes or tomes)
+        sub_items = []
+        scan_dir = file_path if os.path.isdir(file_path) else parent_dir
+        try:
+            if os.path.exists(scan_dir):
+                for f in sorted(os.listdir(scan_dir)):
+                    fp = os.path.join(scan_dir, f)
+                    if os.path.isfile(fp):
+                        ext = os.path.splitext(f)[1].lower()
+                        if ext in [".mkv", ".mp4", ".avi", ".ts", ".m2ts", ".epub", ".pdf", ".cbz", ".cbr", ".flac", ".mp3"]:
+                            sz = os.path.getsize(fp)
+                            sz_mb = sz / (1024 * 1024)
+                            sub_items.append({
+                                "name": f,
+                                "path": fp.replace("\\", "/"),
+                                "size": f"{sz_mb / 1024:.2f} Go" if sz_mb >= 1024 else f"{sz_mb:.2f} Mo",
+                                "size_bytes": sz
+                            })
+        except Exception:
+            pass
+
         return {
             "file_name": os.path.basename(file_path),
             "file_size": total_bytes,
@@ -232,7 +281,12 @@ class MediaAnalyzer:
             "subtitle_tracks": sub_details,
             "languages": list(set(languages)),
             "detected_lang_tag": lang_tag,
-            "raw_text": raw_text
+            "raw_text": raw_text,
+            "embedded_title": embedded_title,
+            "parent_folder": parent_folder,
+            "companion_nfo_tag": companion_nfo_tag,
+            "sub_items": sub_items,
+            "is_dir": os.path.isdir(file_path)
         }
 
     @classmethod

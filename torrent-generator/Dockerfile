@@ -27,12 +27,20 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt && \
     apk del gcc musl-dev linux-headers
 
+# Create TrueNAS apps user/group (UID 568, GID 568)
+RUN addgroup -g 568 apps && \
+    adduser -u 568 -G apps -s /bin/sh -D apps
+
 # Copy application files
 COPY main.py .
 COPY app/ ./app/
 
-# Create mount points
-RUN mkdir -p /config /data /output
+# Create mount points and set permissions for apps user
+RUN mkdir -p /config /data /output && \
+    chown -R apps:apps /config /data /output /app
+
+# Switch to apps user
+USER apps
 
 # Expose Web UI port
 EXPOSE 30017

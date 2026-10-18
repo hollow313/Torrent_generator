@@ -1,16 +1,22 @@
-# Sensitive credentials and tokens - NEVER COMMIT
-Token_github.txt
-Token_github*
+# Personal documentation and API credentials - NEVER COMMIT
+Doc/
+Doc/*
+*API*
 *API*.txt
 Tracker_secours.txt
+Token_github.txt
+Token_github*
 *.key
 *.token
 *.passkey
-.env
-config/config.json
+
+# Configuration & data
+config/
+config.json
 data/
 output/
 torrents/
+.env
 
 # Python
 __pycache__/
@@ -22,7 +28,6 @@ env/
 venv/
 .venv/
 pip-log.txt
-pip-delete-this-directory.txt
 
 # OS / Editor
 .DS_Store
