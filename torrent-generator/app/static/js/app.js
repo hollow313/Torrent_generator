@@ -211,7 +211,7 @@ function getFileIcon(filename) {
 }
 
 // Media Analysis & Generator
-async function selectAndAnalyze(filePath) {
+async function selectAndAnalyze(filePath, forcedMode = null) {
     showToast("Analyse du média en cours...", "info");
     switchTab("generator");
 
@@ -226,10 +226,16 @@ async function selectAndAnalyze(filePath) {
         const res = await fetch("/api/analyze", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ path: filePath })
+            body: JSON.stringify({ 
+                path: filePath,
+                release_mode: forcedMode || "auto"
+            })
         });
 
-        if (!res.ok) throw new Error("Erreur lors de l'analyse du média.");
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.detail || "Erreur lors de l'analyse du média.");
+        }
         const data = await res.json();
         currentAnalysis = data;
         currentAnalysis.source_path = filePath;
@@ -240,11 +246,11 @@ async function selectAndAnalyze(filePath) {
         document.getElementById("download-actions").style.display = "none";
 
         // Populate Overview Card
-        const media = data.media_info;
-        document.getElementById("gen-source-filename").textContent = media.file_name;
+        const media = data.media_info || {};
+        document.getElementById("gen-source-filename").textContent = media.file_name || filePath.split("/").pop();
         document.getElementById("gen-source-path").textContent = `Chemin: ${filePath}`;
         
-        const sizeMb = media.file_size / (1024 * 1024);
+        const sizeMb = (media.file_size || 0) / (1024 * 1024);
         document.getElementById("gen-stat-size").textContent = sizeMb >= 1024 ? `${(sizeMb / 1024).toFixed(2)} Go` : `${sizeMb.toFixed(2)} Mo`;
         document.getElementById("gen-stat-res").textContent = media.resolution || "N/A";
         document.getElementById("gen-stat-video").textContent = media.video_codec || "N/A";
@@ -253,8 +259,8 @@ async function selectAndAnalyze(filePath) {
         document.getElementById("gen-stat-audio").textContent = firstAudio ? `${firstAudio.language} (${firstAudio.format})` : "N/A";
 
         // Populate Namer & Anti-Detag
-        const namer = data.namer;
-        document.getElementById("input-release-title").value = namer.title;
+        const namer = data.namer || {};
+        document.getElementById("input-release-title").value = namer.title || "";
         document.getElementById("input-year").value = namer.year || "";
         document.getElementById("input-lang-tag").value = namer.language || "";
         document.getElementById("select-source").value = namer.source || "WEB";
@@ -268,18 +274,27 @@ async function selectAndAnalyze(filePath) {
             badgeTag.textContent = "AUCUN TAG : -NOTAG";
             badgeTag.className = "badge badge-warning";
         }
-        document.getElementById("text-detag-explanation").textContent = namer.detag_warning;
+        if (namer.detag_warning) {
+            document.getElementById("text-detag-explanation").textContent = namer.detag_warning;
+        }
 
         // Populate Piece Size
-        document.getElementById("select-piece-size").value = data.suggested_piece_size;
-        document.getElementById("badge-piece-calc").textContent = `Recommandé C411 : ${data.suggested_piece_size / (1024 * 1024)} Mo`;
+        if (data.suggested_piece_size) {
+            document.getElementById("select-piece-size").value = data.suggested_piece_size;
+            document.getElementById("badge-piece-calc").textContent = `Recommandé C411 : ${data.suggested_piece_size / (1024 * 1024)} Mo`;
+        }
 
         // Populate Category
-        document.getElementById("select-category").value = data.suggested_category_id;
+        if (data.suggested_category_id) {
+            document.getElementById("select-category").value = data.suggested_category_id;
+        }
 
         // TMDB query prefill
-        const cleanNameGuess = media.file_name.replace(/\b(19\d\d|20\d\d)\b.*$/, "").replace(/[\._\-]/g, " ").trim();
-        document.getElementById("tmdb-search-input").value = cleanNameGuess;
+        const baseNameGuess = (media.file_name || filePath.split("/").pop() || "")
+            .replace(/\b(19\d\d|20\d\d)\b.*$/, "")
+            .replace(/[\._\-]/g, " ")
+            .trim();
+        document.getElementById("tmdb-search-input").value = baseNameGuess;
 
         // Sub-items handling (Episodes in folder or Manga tomes)
         const subItemsCard = document.getElementById("sub-items-card");
@@ -296,7 +311,7 @@ async function selectAndAnalyze(filePath) {
                     <td class="font-mono text-xs"><i class="fa-solid ${isItemBook ? 'fa-book text-info' : 'fa-file-video text-primary'} mr-1"></i> ${escapeHtml(si.name)}</td>
                     <td class="text-xs">${si.size}</td>
                     <td style="text-align: right;">
-                        <button class="btn btn-outline btn-xs" onclick="selectAndAnalyze('${si.path}', '${modeToUse}');">
+                        <button class="btn btn-outline btn-xs" onclick="selectAndAnalyze('${escapeJsString(si.path)}', '${modeToUse}');">
                             <i class="fa-solid fa-play mr-1"></i> ${actionLabel}
                         </button>
                     </td>
@@ -309,18 +324,21 @@ async function selectAndAnalyze(filePath) {
         }
 
         // Set mode from server or forced parameter
-        const effectiveMode = forcedMode || data.suggested_release_mode || "single";
+        const effectiveMode = (typeof forcedMode !== "undefined" && forcedMode) ? forcedMode : (data.suggested_release_mode || "single");
         document.getElementById("select-release-mode").value = effectiveMode;
         updateModeBadge(effectiveMode);
 
         // Populate Editors
-        document.getElementById("editor-nfo").value = data.nfo;
-        document.getElementById("editor-bbcode").value = data.bbcode;
+        document.getElementById("editor-nfo").value = data.nfo || "";
+        document.getElementById("editor-bbcode").value = data.bbcode || "";
+        updateBbcodePreview();
 
         showToast("Média analysé avec succès selon les standards C411 !", "success");
 
         // Auto duplicate check with smart quality & tag comparison
-        checkDuplicatesC411(namer.title);
+        if (namer.title) {
+            checkDuplicatesC411(namer.title);
+        }
 
     } catch (e) {
         showToast(`Échec de l'analyse : ${e.message}`, "error");
@@ -439,6 +457,31 @@ function initGenerator() {
             document.getElementById("select-category").value = isAnime ? "2060" : "2000";
         }
 
+        recalculateTitle();
+    });
+
+    // Dynamic Category change (adapts mode and updates release title)
+    document.getElementById("select-category").addEventListener("change", (e) => {
+        const catId = e.target.value;
+        if (catId.startsWith("7")) {
+            // Ebooks / Manga
+            const currentMode = document.getElementById("select-release-mode").value;
+            if (currentMode !== "manga_tome" && currentMode !== "manga_pack") {
+                document.getElementById("select-release-mode").value = "manga_tome";
+                updateModeBadge("manga_tome");
+            }
+        } else if (catId.startsWith("5")) {
+            // Séries TV / Animes
+            const currentMode = document.getElementById("select-release-mode").value;
+            if (currentMode === "single" || currentMode.startsWith("manga")) {
+                document.getElementById("select-release-mode").value = "season_pack";
+                updateModeBadge("season_pack");
+            }
+        } else if (catId.startsWith("2")) {
+            // Films
+            document.getElementById("select-release-mode").value = "single";
+            updateModeBadge("single");
+        }
         recalculateTitle();
     });
 
@@ -735,6 +778,12 @@ async function searchTmdb() {
             return;
         }
 
+        if (data.direct_match && data.results && data.results.length === 1) {
+            applyTmdbMetadata(data.results[0]);
+            showToast(`Fiche TMDB trouvée et appliquée : "${data.results[0].title}" !`, "success");
+            return;
+        }
+
         if (badge) badge.textContent = `${data.results.length} résultat(s)`;
         list.innerHTML = "";
         data.results.forEach(item => {
@@ -759,11 +808,17 @@ async function searchTmdb() {
 
 function applyTmdbMetadata(item) {
     document.getElementById("tmdb-id-val").value = item.id;
+    document.getElementById("imdb-id-val").value = item.imdb_id || "";
     document.getElementById("poster-url-val").value = item.poster_url || "";
     document.getElementById("tmdb-results-container").style.display = "none";
 
     const badge = document.getElementById("tmdb-status-badge");
     if (badge) badge.textContent = `Fiche : ${item.title} (${item.year || 'N/A'})`;
+
+    if (item.year && !document.getElementById("input-year").value) {
+        document.getElementById("input-year").value = item.year;
+        recalculateTitle();
+    }
 
     // Regenerate BBCode description with Poster and French Synopsis
     if (currentAnalysis) {
@@ -874,7 +929,7 @@ async function runMassScan() {
         }
 
         const data = await res.json();
-        scannerResults = data.items || [];
+        scannerResults = data.results || data.items || [];
 
         // Update KPIs
         const total = scannerResults.length;

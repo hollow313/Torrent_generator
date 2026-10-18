@@ -1,5 +1,6 @@
 import os
-from typing import Dict, Any, List, Optional
+import re
+from typing import Dict, Any, List, Optional, Tuple
 import httpx
 
 class TmdbClient:
@@ -7,6 +8,23 @@ class TmdbClient:
         self.api_key = api_key.strip()
         self.base_url = "https://api.themoviedb.org/3"
         self.image_base_url = "https://image.tmdb.org/t/p/w500"
+
+    def _get_auth(self) -> Tuple[Dict[str, str], Dict[str, str]]:
+        """
+        Supports both TMDB v3 API Key (32 hex chars) and v4 API Read Access Token (JWT starting with eyJ).
+        """
+        headers = {"Accept": "application/json"}
+        params = {}
+        if not self.api_key:
+            return headers, params
+
+        # If it's a JWT Bearer token (starts with eyJ or length > 40)
+        if self.api_key.startswith("eyJ") or len(self.api_key) > 40:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        else:
+            params["api_key"] = self.api_key
+
+        return headers, params
 
     async def search(self, query: str, year: Optional[str] = None, media_type: str = "movie") -> List[Dict[str, Any]]:
         """
@@ -16,12 +34,12 @@ class TmdbClient:
             return []
 
         endpoint = f"{self.base_url}/search/{media_type}" if media_type in ["movie", "tv"] else f"{self.base_url}/search/multi"
-        params = {
-            "api_key": self.api_key,
+        headers, params = self._get_auth()
+        params.update({
             "query": query.strip(),
             "language": "fr-FR",
             "include_adult": "false"
-        }
+        })
         if year and media_type == "movie":
             params["year"] = year
         elif year and media_type == "tv":
@@ -29,8 +47,9 @@ class TmdbClient:
 
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
-                resp = await client.get(endpoint, params=params)
+                resp = await client.get(endpoint, headers=headers, params=params)
                 if resp.status_code != 200:
+                    print(f"[TMDB] Search error status {resp.status_code}: {resp.text}")
                     return []
                 results = resp.json().get("results", [])
                 
@@ -56,7 +75,7 @@ class TmdbClient:
                     })
                 return formatted
         except Exception as e:
-            print(f"[TMDB] Search error: {e}")
+            print(f"[TMDB] Search exception: {e}")
             return []
 
     async def get_details(self, tmdb_id: int, media_type: str = "movie") -> Optional[Dict[str, Any]]:
@@ -65,16 +84,17 @@ class TmdbClient:
             return None
 
         endpoint = f"{self.base_url}/{media_type}/{tmdb_id}"
-        params = {
-            "api_key": self.api_key,
+        headers, params = self._get_auth()
+        params.update({
             "language": "fr-FR",
             "append_to_response": "external_ids"
-        }
+        })
 
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
-                resp = await client.get(endpoint, params=params)
+                resp = await client.get(endpoint, headers=headers, params=params)
                 if resp.status_code != 200:
+                    print(f"[TMDB] get_details error {resp.status_code}: {resp.text}")
                     return None
                 data = resp.json()
                 
@@ -83,11 +103,16 @@ class TmdbClient:
                 poster_path = data.get("poster_path")
                 poster_url = f"{self.image_base_url}{poster_path}" if poster_path else ""
 
+                release_date = data.get("release_date") or data.get("first_air_date") or ""
+                item_year = release_date.split("-")[0] if release_date else ""
+
                 return {
                     "id": data.get("id"),
                     "imdb_id": imdb_id,
+                    "media_type": media_type,
                     "title": data.get("title") or data.get("name") or "",
                     "original_title": data.get("original_title") or data.get("original_name") or "",
+                    "year": item_year,
                     "synopsis": data.get("overview", ""),
                     "poster_url": poster_url,
                     "genres": [g["name"] for g in data.get("genres", [])]
@@ -102,14 +127,14 @@ class TmdbClient:
             return None
         clean_imdb = imdb_id.strip()
         url = f"{self.base_url}/find/{clean_imdb}"
-        params = {
-            "api_key": self.api_key,
+        headers, params = self._get_auth()
+        params.update({
             "external_source": "imdb_id",
             "language": "fr-FR"
-        }
+        })
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
-                resp = await client.get(url, params=params)
+                resp = await client.get(url, headers=headers, params=params)
                 if resp.status_code != 200:
                     return None
                 data = resp.json()
@@ -128,20 +153,24 @@ class TmdbClient:
         """
         Parses a TMDB URL, IMDb URL, or direct ID (tmdb or imdb) and returns full movie/tv details.
         """
-        import re
         s = input_str.strip()
         if not s:
             return None
 
-        # 1. Match TMDB URL (e.g. https://www.themoviedb.org/movie/550 or /tv/1399)
-        tmdb_url_match = re.search(r"themoviedb\.org/(movie|tv)/(\d+)", s)
+        # 1. Match TMDB URL (e.g. https://www.themoviedb.org/movie/38700-bad-boys-for-life or /tv/1399)
+        tmdb_url_match = re.search(r"themoviedb\.org/(movie|tv)/(\d+)", s, re.IGNORECASE)
         if tmdb_url_match:
-            m_type = tmdb_url_match.group(1)
+            m_type = tmdb_url_match.group(1).lower()
             t_id = int(tmdb_url_match.group(2))
-            return await self.get_details(t_id, m_type)
+            details = await self.get_details(t_id, m_type)
+            if not details:
+                # Try the other type if not found
+                alt_type = "tv" if m_type == "movie" else "movie"
+                details = await self.get_details(t_id, alt_type)
+            return details
 
         # 2. Match IMDb URL or ID (e.g. https://www.imdb.com/title/tt0137523/ or tt0137523)
-        imdb_match = re.search(r"(tt\d{7,8})", s)
+        imdb_match = re.search(r"(tt\d{7,8})", s, re.IGNORECASE)
         if imdb_match:
             return await self.find_by_imdb(imdb_match.group(1))
 
@@ -154,3 +183,4 @@ class TmdbClient:
             return details
 
         return None
+

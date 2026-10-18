@@ -87,7 +87,14 @@ class ReleaseNamer:
                 existing_tag = p_tag
                 tag_source = "dossier parent d'origine"
 
-        # 4. Check companion .nfo file
+        # 4. Check main video file name inside directory
+        if not existing_tag and media_info.get("main_file_name"):
+            m_tag, _ = cls.extract_existing_tag(media_info["main_file_name"])
+            if m_tag:
+                existing_tag = m_tag
+                tag_source = "fichier média principal"
+
+        # 5. Check companion .nfo file
         if not existing_tag and media_info.get("companion_nfo_tag"):
             existing_tag = media_info["companion_nfo_tag"]
             tag_source = "fichier .nfo associé"
@@ -103,17 +110,27 @@ class ReleaseNamer:
         year_match = re.search(r"\b(19\d\d|20\d\d)\b", raw_name)
         if not year_match and media_info.get("embedded_title"):
             year_match = re.search(r"\b(19\d\d|20\d\d)\b", media_info["embedded_title"])
+        if not year_match and media_info.get("main_file_name"):
+            year_match = re.search(r"\b(19\d\d|20\d\d)\b", media_info["main_file_name"])
         year = custom_year or (year_match.group(1) if year_match else "")
 
         # Resolution
         resolution = media_info.get("resolution", "1080p")
 
         # Source
-        source = custom_source or "WEB"
-        for s in cls.SOURCES:
-            if re.search(rf"\b{re.escape(s)}\b", raw_name, re.IGNORECASE):
-                source = s
-                break
+        source = custom_source or None
+        if not source:
+            for s in cls.SOURCES:
+                if re.search(rf"\b{re.escape(s)}\b", raw_name, re.IGNORECASE):
+                    source = s
+                    break
+        if not source and media_info.get("main_file_name"):
+            for s in cls.SOURCES:
+                if re.search(rf"\b{re.escape(s)}\b", media_info["main_file_name"], re.IGNORECASE):
+                    source = s
+                    break
+        if not source:
+            source = "WEB"
 
         # Video codec
         video_codec = media_info.get("video_codec", "x264")

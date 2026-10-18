@@ -286,7 +286,9 @@ class MediaAnalyzer:
             "parent_folder": parent_folder,
             "companion_nfo_tag": companion_nfo_tag,
             "sub_items": sub_items,
-            "is_dir": os.path.isdir(file_path)
+            "is_dir": os.path.isdir(file_path),
+            "main_file_name": os.path.basename(target_file),
+            "main_file_path": target_file
         }
 
     @classmethod
@@ -294,6 +296,7 @@ class MediaAnalyzer:
         """Basic fallback when MediaInfo is not installed."""
         size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
         ext = os.path.splitext(file_path)[1].lstrip(".").upper()
+        parent_dir = os.path.dirname(os.path.abspath(file_path))
         
         return {
             "file_name": os.path.basename(file_path),
@@ -317,5 +320,12 @@ class MediaAnalyzer:
             ],
             "languages": ["Français"],
             "detected_lang_tag": "MULTI.VFF",
-            "raw_text": f"General\nComplete name: {file_path}\nFile size: {size} bytes\nFormat: {ext}\n"
+            "raw_text": f"General\nComplete name: {file_path}\nFile size: {size} bytes\nFormat: {ext}\n",
+            "embedded_title": "",
+            "parent_folder": os.path.basename(parent_dir),
+            "companion_nfo_tag": None,
+            "sub_items": [],
+            "is_dir": os.path.isdir(file_path),
+            "main_file_name": os.path.basename(file_path),
+            "main_file_path": file_path
         }

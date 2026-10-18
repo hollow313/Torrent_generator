@@ -280,7 +280,10 @@ async def analyze_file(req: AnalyzeRequest):
 
     # 2. Release name formatting according to C411 standards
     raw_name = os.path.basename(req.path)
-    namer_res = ReleaseNamer.format_c411_title(raw_name, media_info, release_mode=effective_mode)
+    if os.path.isdir(req.path) and effective_mode == "single" and media_info.get("main_file_name"):
+        raw_name = media_info["main_file_name"]
+    cat_name = "E-Books" if suggested_category_id == 1000 else "Films & Vidéos"
+    namer_res = ReleaseNamer.format_c411_title(raw_name, media_info, category=cat_name, release_mode=effective_mode)
 
     # 3. Piece size calculation
     total_bytes = media_info.get("file_size", 0)
@@ -487,6 +490,7 @@ async def mass_scan(req: MassScanRequest):
 
     candidates = []
     video_exts = {".mkv", ".mp4", ".avi", ".ts", ".m2ts"}
+    book_exts = {".cbz", ".cbr", ".epub", ".pdf"}
 
     mode = req.scan_mode or "auto"
     folder_lower = req.folder_path.lower()
@@ -496,7 +500,7 @@ async def mass_scan(req: MassScanRequest):
         elif "manga" in folder_lower:
             mode = "mangas"
         elif "serie" in folder_lower:
-            mode = "series_season"
+            mode = "series_seasons"
         else:
             mode = "films"
 
@@ -505,7 +509,7 @@ async def mass_scan(req: MassScanRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur d'accès au dossier : {e}")
 
-    limit = req.limit or 30
+    limit = req.limit or 150
     for entry in entries:
         if len(candidates) >= limit:
             break
@@ -518,51 +522,76 @@ async def mass_scan(req: MassScanRequest):
 
         if entry.is_file():
             ext = os.path.splitext(item_name)[1].lower()
-            if ext in video_exts:
+            if ext in video_exts or ext in book_exts:
+                is_manga_book = ext in book_exts
+                file_mode = "episode" if mode in ["series_episodes", "series_episode"] else ("manga_tome" if is_manga_book else "single")
                 candidates.append({
                     "path": item_path,
                     "name": item_name,
+                    "search_name": item_name,
                     "is_dir": False,
                     "size_bytes": entry.stat().st_size,
-                    "mode": "episode" if mode in ["series_episode", "mangas"] else "single"
+                    "mode": file_mode
                 })
         elif entry.is_dir():
             sz = 0
-            has_video = False
+            has_media = False
             video_count = 0
+            largest_file_name = None
+            largest_file_size = 0
             try:
                 for root, _, files in os.walk(item_path):
                     for f in files:
-                        if os.path.splitext(f)[1].lower() in video_exts:
-                            has_video = True
-                            video_count += 1
-                            sz += os.path.getsize(os.path.join(root, f))
+                        ext = os.path.splitext(f)[1].lower()
+                        if ext in video_exts or ext in book_exts:
+                            has_media = True
+                            f_sz = os.path.getsize(os.path.join(root, f))
+                            sz += f_sz
+                            if ext in video_exts:
+                                video_count += 1
+                            if f_sz > largest_file_size:
+                                largest_file_size = f_sz
+                                largest_file_name = f
             except Exception:
                 pass
 
-            if has_video:
-                if mode == "series_episode":
-                    # Add individual episodes inside
+            if has_media:
+                if mode in ["series_episodes", "series_episode"]:
+                    # Extract individual episode files inside the folder
                     try:
-                        for f in sorted(os.listdir(item_path)):
-                            fp = os.path.join(item_path, f)
-                            if os.path.isfile(fp) and os.path.splitext(f)[1].lower() in video_exts:
-                                if len(candidates) >= limit:
-                                    break
-                                candidates.append({
-                                    "path": fp.replace("\\", "/"),
-                                    "name": f,
-                                    "is_dir": False,
-                                    "size_bytes": os.path.getsize(fp),
-                                    "mode": "episode"
-                                })
+                        for root, _, files in os.walk(item_path):
+                            for f in sorted(files):
+                                if os.path.splitext(f)[1].lower() in video_exts:
+                                    if len(candidates) >= limit:
+                                        break
+                                    fp = os.path.join(root, f).replace("\\", "/")
+                                    candidates.append({
+                                        "path": fp,
+                                        "name": f,
+                                        "search_name": f,
+                                        "is_dir": False,
+                                        "size_bytes": os.path.getsize(fp),
+                                        "mode": "episode"
+                                    })
                     except Exception:
                         pass
                 else:
-                    folder_mode = "season_pack" if ("s0" in item_name.lower() or "saison" in item_name.lower() or "season" in item_name.lower()) else ("integrale" if video_count > 1 else "single")
+                    if mode in ["films", "film"]:
+                        folder_mode = "single"
+                    elif "manga" in mode or "/mangas" in folder_lower:
+                        folder_mode = "manga_pack"
+                    elif any(k in item_name.lower() for k in ["s0", "saison", "season", "s1", "s2", "s3"]):
+                        folder_mode = "season_pack"
+                    elif video_count > 1:
+                        folder_mode = "integrale"
+                    else:
+                        folder_mode = "single"
+
+                    search_name = largest_file_name if largest_file_name else item_name
                     candidates.append({
                         "path": item_path,
                         "name": item_name,
+                        "search_name": search_name,
                         "is_dir": True,
                         "size_bytes": sz,
                         "mode": folder_mode
@@ -572,20 +601,23 @@ async def mass_scan(req: MassScanRequest):
     results = []
     for item in candidates:
         import re
-        name = item["name"]
+        name = item.get("search_name") or item["name"]
         sz_mb = item["size_bytes"] / (1024 * 1024)
         size_str = f"{sz_mb / 1024:.2f} Go" if sz_mb >= 1024 else f"{sz_mb:.2f} Mo"
 
         res_match = re.search(r"\b(2160p|1080p|720p|576p|480p)\b", name, re.IGNORECASE)
-        resolution = res_match.group(1).lower() if res_match else "1080p"
+        resolution = res_match.group(1).lower() if res_match else item.get("resolution", "1080p")
 
         src_match = re.search(r"\b(BluRay|BDRip|BRRip|WEB-DL|WEBRip|WEB|HDTV|DVDRip|REMUX)\b", name, re.IGNORECASE)
-        source = src_match.group(1) if src_match else "WEB"
+        source = src_match.group(1) if src_match else item.get("source", "WEB")
 
         tag_match = re.search(r"-([A-Za-z0-9_]+)(?:\.[a-zA-Z0-9]+)?$", name)
-        tag = tag_match.group(1) if tag_match else "NOTAG"
+        tag = tag_match.group(1) if tag_match else item.get("tag", "NOTAG")
 
-        # Check duplicates
+        # Clean release title for presentation
+        clean_title = ReleaseNamer.clean_title(item["name"])
+
+        # Check duplicates on C411
         dupe_res = await tracker.check_duplicates(
             title=name,
             resolution=resolution,
@@ -620,17 +652,22 @@ async def mass_scan(req: MassScanRequest):
         results.append({
             "path": item["path"],
             "name": item["name"],
+            "clean_title": clean_title,
             "is_dir": item["is_dir"],
+            "size": size_str,
             "size_str": size_str,
             "size_bytes": item["size_bytes"],
             "resolution": resolution.upper(),
             "source": source,
             "tag": tag,
             "mode": item["mode"],
+            "suggested_mode": item["mode"],
             "status": status,
+            "status_code": status,
             "status_label": status_label,
             "details": details,
-            "c411_match": match_item
+            "c411_match": match_item,
+            "duplicates_info": dupe_res
         })
         await asyncio.sleep(0.04)
 
@@ -638,7 +675,8 @@ async def mass_scan(req: MassScanRequest):
         "folder_path": req.folder_path,
         "scan_mode": mode,
         "total_scanned": len(results),
-        "results": results
+        "results": results,
+        "items": results
     }
 
 @app.get("/api/download")

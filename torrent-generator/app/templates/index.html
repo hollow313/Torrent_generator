@@ -630,13 +630,21 @@
                             <div class="grid-2-col gap-3 mb-3">
                                 <div class="form-group">
                                     <label class="form-label">Utilisateur</label>
-                                    <input type="text" id="cfg-qb-user" class="input" value="admin">
+                                    <input type="text" id="cfg-qb-user" class="input" placeholder="ex: admin">
                                     <small class="form-hint">Laisser vide si aucun login.</small>
                                 </div>
                                 <div class="form-group">
                                     <label class="form-label">Mot de passe</label>
                                     <input type="password" id="cfg-qb-pass" class="input" placeholder="Laisser vide si pas de mot de passe">
                                     <small class="form-hint">Optionnel si accès local sans mot de passe.</small>
+                                </div>
+                            </div>
+
+                            <div class="alert alert-info mb-3 text-xs" style="line-height: 1.5;">
+                                <i class="fa-solid fa-circle-info mr-2" style="font-size: 1rem;"></i>
+                                <div>
+                                    <strong>Astuce connexion qBittorrent sur serveur :</strong><br>
+                                    Si vous n'utilisez pas de mot de passe, dans qBittorrent &rarr; <em>Options</em> &rarr; <em>Web UI</em>, cochez <em>"Ne pas demander d'authentification pour les sous-réseaux suivants"</em> et ajoutez : <code>172.16.0.0/12, 192.168.0.0/16, 10.0.0.0/8</code>. Cela permettra au conteneur de se connecter immédiatement sans mot de passe !
                                 </div>
                             </div>
 
@@ -670,7 +678,8 @@
 
                             <div class="form-group mb-4">
                                 <label class="form-label">Clé API TMDB (Optionnelle)</label>
-                                <input type="password" id="cfg-tmdb-key" class="input" placeholder="Clé API v3 TMDB">
+                                <input type="password" id="cfg-tmdb-key" class="input font-mono" placeholder="Clé API v3 ou Jeton d'accès v4 (eyJ...)">
+                                <small class="form-hint">Supporte à la fois la clé API v3 ou le jeton de lecture v4 (commençant par eyJ...).</small>
                             </div>
 
                             <button class="btn btn-secondary btn-sm" id="btn-test-qb">
