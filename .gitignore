@@ -1,0 +1,33 @@
+# Sensitive credentials and tokens - NEVER COMMIT
+Token_github.txt
+Token_github*
+*API*.txt
+Tracker_secours.txt
+*.key
+*.token
+*.passkey
+.env
+config/config.json
+data/
+output/
+torrents/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.vscode/
+.idea/

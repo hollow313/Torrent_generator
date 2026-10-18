@@ -1,0 +1,679 @@
+Le Nommage de l'upload
+
+Un nommage rigoureux est indispensable. Il permet aux utilisateurs d’identifier et de retrouver rapidement le contenu, facilite le travail de validation de la Team Pending et assure une reconnaissance fiable par les outils d’automatisation de la stack *arr (Radarr, Sonarr, Lidarr, etc.).
+
+Dans cette optique, les principes généraux de nommage présentés ci-dessous constituent la base à respecter avant d’aborder les cas particuliers propres à chaque typologie de contenu.
+Principes généraux de nommage
+
+Les principes ci-dessous constituent le socle du nommage sur C411 et doivent être appliqués systématiquement, quelle que soit la typologie de contenu.
+
+Principe d'uniformité typographique
+
+    Le séparateur de mots est le POINT (pas d'espace, tiret ou caractère exotique)
+
+Principe d'accentuation
+
+    Aucun accent ni caractère non standard n’est admis dans les noms de fichiers.
+
+Principe d'intégrité du tag d'origine
+
+    Le tag de la team d’origine doit être conservé lors d’un repost.
+
+Principe de paternité de la release
+
+    Tout ajout de tag personnel est interdit en l’absence de création originale.
+
+Principe de traçabilité minimale
+
+    En cas de tag d’origine introuvable, le suffixe -NOTAG est requis.
+
+Exceptions en cas de modification substantielle
+
+Toute altération d’un fichier existant (ajout de sous-titres, ajout/changement de piste audio, ré-encodage, etc.) entraîne l’application des règles suivantes :
+
+    Le tag de la team source doit être retiré du titre de la release ainsi que du nom des fichiers.
+
+    Le nom de la release d’origine doit être mentionné dans la présentation et/ou dans le NFO.
+
+Nommage par catégorie
+
+Films & vidéos
+
+Avant d'aller plus loin, il est nécessaire de consulter les modalités et contenu autorisé en cliquant ici
+
+En fonction de leur typologie, différents templates doivent être respectés. Pour cette catégorie, la convention de nommage est la plus stricte afin de favoriser la compatibilité avec les servarr. À noter que la résolution n'est pas obligatoire lorsque la qualité est inférieure à 720p
+
+Films, Spectacle, Sport
+Format :
+
+Nom.Année.Langue.Résolution.Source.CodecAudio.CodecVidéo-TEAM
+
+Exemple :
+
+Scooby.Doo.Aventures.En.Transylvanie.2014.MULTI.VFF.1080p.WEB.AAC.2.0.H264-PiCKLES
+
+Merlin.L.Enchanteur.1963.MULTi.VFF.2160p.WEB.DV.HDR10.EAC3.5.1.H265-TFA
+
+The.Dark.Knight.Rises.2012.IMAX.MULTI.VF2.2160p.BluRay.4KLight.DV.HDR10.EAC3.5.1.x265-D4RK
+
+Big.Fish.2003.PROPER.MULTI.VFF.1080p.BluRay.AC3.5.1.x264-FiDELiO
+
+Django.Unchained.2012.MULTI.TRUEFRENCH.1080p.BluRay.REMUX.DTS.HD.MA.5.1.AVC-RiFiFi
+
+Mondwest.1973.REPACK.CUSTOM.MULTi.VFI.2160p.UHD.BluRay.REMUX.DV.HDR10.DTS.HD.MA.5.1.HEVC-LaFistiniere
+
+Roman.Frayssinet.O.Dela.2026.VFF.2160p.WEBRip.EAC3.2.0.x265-SKETCH
+
+Doully.Hier.J.Arrete.2025.VFF.1080p.WEBRip.EAC3.2.0.x264-THESYNDiCATE
+
+UFC.Fight.Night.266.Bautista.Vs.Oliveira.Prelims.VFQ.1080p.WEBRip.AAC.2.0.x264-MMAFAN
+
+Monaco.Lyon.3012026.VFF.720p.WEB.EAC3.5.1.H264-PiCKLES
+
+    Pour les profils HDR :
+
+Format :
+
+Nom.Année.Langue.Résolution.Source.(Details de la version).CodecAudio.CodecVidéo-TEAM
+
+Exemple :
+
+Gladiator.2000.MULTI.VFF.2160p.BluRay.HDR10.DTS.HD.MA.5.1.x265-ZEKEY
+
+Mad.Max.Fury.Road.2015.MULTI.VFF.2160p.BluRay.HDR10PLUS.TrueHD.Atmos.7.1.x265-ZEKEY
+
+Le.Comte.de.Monte.Cristo.2024.VOF.2160p.BluRay.DV.HDR10PLUS.TrueHD.Atmos.7.1.x265-ZEKEY
+
+Dune.Part.Two.2024.MULTI.VFF.2160p.BluRay.DV.HDR10.TrueHD.Atmos.7.1.x265-ZEKEY
+
+Oppenheimer.2023.MULTI.VFF.2160p.BluRay.DV.TrueHD.Atmos.7.1.x265-ZEKEY
+
+    Pour un REMUX, BDMV ou ISO :
+
+Format :
+
+Nom.Année.Langue.Résolution.Source.(REMUX|BDMV|ISO).CodecAudio.CodecVidéo-TEAM
+
+Exemples :
+
+Le.Comte.de.Monte.Cristo.2024.VOF.2160p.UHD.BluRay.REMUX.DV.HDR10PLUS.TrueHD.Atmos.7.1.HEVC-ZEKEY
+
+Le.Comte.de.Monte.Cristo.2024.VOF.2160p.UHD.BluRay.BDMV.DV.HDR10PLUS.TrueHD.Atmos.7.1.HEVC-ZEKEY
+
+Le.Comte.de.Monte.Cristo.2024.VOF.2160p.UHD.BluRay.ISO.DV.HDR10PLUS.TrueHD.Atmos.7.1.HEVC-ZEKEY
+
+Le.Comte.de.Monte.Cristo.2024.VOF.1080p.BluRay.REMUX.DTS.HD.MA.5.1.AVC-ZEKEY
+
+Le.Comte.de.Monte.Cristo.2024.VOF.1080p.BluRay.BDMV.DTS.HD.MA.5.1.AVC-ZEKEY
+
+Le.Comte.de.Monte.Cristo.2024.VOF.1080p.BluRay.ISO.DTS.HD.MA.5.1.AVC-ZEKEY
+
+    Pour Les Packs/Collections :
+
+Format :
+
+Nom.COLLECTION.Année.Langue.Résolution.Source.CodecAudio.CodecVidéo-TEAM
+
+Exemple :
+
+X.Men.COLLECTION.2000.2020.MULTI.VFF.1080p.BluRay.AC3.5.1.x264-SENSEI
+
+Jason.Bourne.COLLECTION.2002.2016.MULTI.VFF.2160p.WEB.AC3.5.1.H265-TyHD
+
+Les.Intemporels.Disney.COLLECTION.2009.TRUEFRENCH.576p.DVDRip.AC3.2.0.x264-DRAGSTER
+
+Vidéo-clips, Concert
+Format :
+
+NOM.ANNÉE.RESOLUTION.SOURCE.CodecAudio.CodecVidéo-TEAM
+
+Exemples :
+
+Design.Of.a.Decade.Janet.Jackson.1986.1996.576p.DVDRip.FLAC.2.0.x264-NOTAG
+
+Helene.Le.Concert.Evenement.Au.Theatre.Marigny.2025.1080p.WEB.AAC.2.0.H264-THESYNDiCATE
+
+Documentaires
+Format :
+
+Nom.Année.DOC.Langue.Résolution.Source.CodecAudio.CodecVidéo-TEAM
+
+Exemple :
+
+Ligne.Rouge.Crans-Montana.Le.Recit.d.Une.Nuit.d.Horreur.2026.DOC.VFF.1080p.WEB.AAC.2.0.H264-THESYNDiCATE
+
+Émission TV
+Format :
+
+Nom.SXXEXX.DATE.Langue.Résolution.Source.CodecAudio.CodecVidéo-TEAM
+
+Exemple :
+
+Sept.a.Huit.S25E17.04.01.2026.VFF.1080p.WEB.AAC.2.0.H264-THESYNDiCATE
+
+Séries (TV + Animation)
+
+    Pour les épisodes :
+
+Format :
+
+Nom.SXXEXX.Langue.Résolution.Source.CodecAudio.CodecVidéo-TEAM
+
+Exemple :
+
+My.Hero.Academia.Vigilantes.S02E01.MULTI.VFI.WEB.1080p.AAC.2.0.H264-Tsundere-Raws
+
+NCIS.Tony.Et.Ziva.S01E02.VFF.1080p.WEB.AAC.2.0.H264-THESYNDiCATE
+
+    Pour les saisons :
+
+    Pack saison unique :
+
+Format :
+
+Nom.SXX.Langue.Résolution.Source.CodecAudio.CodecVidéo-TEAM
+
+Exemple :
+
+Mr.Robot.S01.MULTI.VFF.1080p.WEB.EAC3.5.1.H264-FW
+
+Fallout.S02.MULTI.VF2.2160p.WEB.HDR10.EAC3.5.1.H265-SUPPLY
+
+Squid.Game.S01.MULTI.VFF.2160p.WEBRip.4KLight.DV.HDR10.EAC3.Atmos.5.1.x265-ASKO
+
+Doctor.Who.2005.S01.VFF.720p.BluRay.AAC.2.0.x264-MiND
+
+Breaking.Bad.S01.MULTI.VFF.720p.BluRay.AC3.5.1.x264-MiND
+
+American.Dad.S16.UNCENSORED.TRUEFRENCH.1080p.WEBRip.AC3.2.0.x264-FTMVHD
+
+    Pack saisons multiples :
+
+Format :
+
+Nom.(INTERVALLE des saisons comprises dans le pack SXXSXX).Langue.Résolution.Source.CodecAudio.CodecVidéo-TEAM
+
+Exemple :
+
+Berzerk.S01S03.VOSTFR.576p.DVDRip.AAC.2.0.x264-NOTAG
+
+Doctor.Who.2005.S01S05.VFF.720p.BluRay.AAC.2.0.x264-MiND
+
+Dans le premier exemple, les saisons 1 à 3 sont disponibles. Le second illustre le cas où l'année est nécessaire (homonyme/reboot).
+
+    Pack intégrale :
+
+Format :
+
+Nom.INTEGRALE.Langue.Résolution.Source.CodecAudio.CodecVidéo-TEAM
+
+Exemple :
+
+Dragon.Ball.Z.1989.INTEGRALE.MULTI.VFF.1080p.BluRay.HDLight.AC3.2.0.x265-Thebatou8652
+
+Breaking.Bad.INTEGRALE.MULTI.VFF.1080p.WEB.EAC3.5.1.H265-BTT
+
+Squid.Game.2021.INTEGRALE.MULTI.VFF.1080p.WEBRip.EAC3.5.1.x265-TyHD
+
+Game.Of.Thrones.INTEGRALE.MULTI.VFF.2160p.UHD.BluRay.REMUX.DV.HDR10.TrueHD.Atmos.7.1.HEVC-clemflix
+
+Intégrale à saison unique : conservez le token S01 dans le titre (exemple : Serie.S01.INTEGRALE.MULTI.VFF.1080p.WEB.EAC3.5.1.H265-TEAM). Sans lui, les outils automatiques (Sonarr et similaires) ne peuvent pas identifier la saison.
+
+    Cas particuliers
+
+L'exception s'applique aux pack et aux épisodes
+
+    Relatif à l'année :
+
+L'année devient nécessaire lorsque la série a un homonyme ou reboot : Format :
+
+Nom.ANNÉE.SXXEXX.Langue.Résolution.Source.CodecAudio.CodecVidéo-TEAM
+
+Exemple :
+
+Doctor.Who.1963.S01E01.VOSTFR.FANSUB.1080p.BluRay.HDLight.AAC.2.0.x264-NOTAG
+
+Doctor.Who.2005.S01E01.MULTI.VFF.1080p.BluRay.AC3.5.1.x264-MiND
+
+Audio
+
+Avant de s’attarder sur les conventions de nommage, il est essentiel de vérifier que le contenu proposé relève bien du périmètre autorisé par la catégorie. Les règles d’admissibilité déterminent ce qui peut être publié et conditionnent ensuite la manière de qualifier correctement la release.
+
+Avant d'aller plus loin, il est nécessaire de consulter les modalités et contenu autorisé en cliquant ici
+Musique
+Le nommage musical doit permettre d’identifier immédiatement l’artiste, l’œuvre et l’année de publication, tout en rendant explicite le format audio. Cette structure facilite l’indexation, limite les confusions entre éditions, et rend le catalogue exploitable sans lecture préalable du NFO.Format :
+
+Artiste.Nom.Année.Codec[Bitrate.Frequence]-TAG
+
+Exemple :
+
+The.Weeknd.Blinding.Lights.2019.FLAC[16bit.44.1kHz]-NOTAG
+
+Demi.Lovato.It.s.Not.That.Deep.Little.Bit.Extra.Version.2025.MP3[320kbps]-NOTAG
+
+NOTE : Le MP3 est un fichier compressé, il n'a pas de profondeur en bits, contrairement aux fichiers audio sans pertes :)
+Podcast / Radio
+Les podcasts et émissions s’identifient d’abord par leur programme et leur période de diffusion. Le nommage doit donc mettre en avant le titre de l’émission et la date, tout en conservant une indication claire du codec afin de garantir une lecture immédiate.Format :
+
+NomÉmission.Date.Codec.format-Team
+
+Exemple :
+
+Le.Bureau.des.mystères.Saison.2.2018-2019.[MP3 192 kb/s]-NOTAG
+
+    Cas particuliers :
+        Lorsque le podcast est une intégrale :
+
+Format :
+
+Nom.Date.INTEGRALE.Codec.format-Team
+
+Exemple :
+
+Le.Bureau.des.mystères.INTEGRALE.2018-2019.[MP3 192 kb/s]-NOTAG
+
+Samples
+Les packs de samples se distinguent moins par un artiste que par un produit ou une collection. Le nommage doit donc rester sobre, descriptif et immédiatement informatif sur la période et le format proposé.Format :
+
+Nom.Année.codec.bitrate
+
+Jeux vidéo
+
+Jeux Linux, MacOS et Windows
+
+La catégorie entière bénéficie d’une exception et n’est pas soumise au principe général d’uniformité typographique. Cette décision est motivée par la nécessité de lisibilité dans le catalogue qui serait entravé par le principe. En effet, le catalogue des jeux vidéo n'est pas destiné au parsing par les servarr (peut-être un jour et on s'adaptera ;)), pour cette raison, les règles de nommage sont plus flexibles
+
+Avant d'aller plus loin, il est nécessaire de consulter les modalités et contenu autorisé en cliquant ici
+Scene release
+Format :Le nom complet de la release doit être conservé pour que les peers qui rechercheraient la release, puisse la retrouver facilement ;) Exemple :
+
+PATHOLOGIC.3-RUNE (V1.0)
+
+ANCIENT FARM-TENOKE (V1.0.8)
+
+Repack
+Le même régime que pour les Scenes release s'applique :) Exemple :
+
+FIFA 22 v1.0.77.45722 [FitGirl Repack][WIN 64 MULTI Précracké]
+
+Version Portable
+Format :
+
+Nom - version [OS - Langue - PORTABLE]
+
+Exemple :
+
+MECHWARRIOR 5 : CLANS V1.0.132 / 20986587 BUILD [WIN X64 MULTI PORTABLE]
+
+ROBOCOP.ROGUE.CITY.V1.0.4.MACOS-ARM [MACOS MULTI PORTABLE]
+
+DETECTIVE UNITED VENGEANCE FROM THE PAST CE BUILD 19197261 [WIN X64 MULTI PORTABLE]
+
+Version GOG / DRM FREE
+Format :
+
+ Nom (Version) [Langue - OS][GOG/DRM FREE]
+
+Exemple :
+
+DYSTHANASIA (V1.0.7WA2) [MULTI WIN X64][GOG]
+
+THE RIFTBREAKER: DELUXE EDITION (V2.0.56960) [EN LINUX][GOG]
+
+ASSASSIN'S CREED SHADOWS 1.0.26 [MULTI MACOS][DRM FREE]
+
+Jeux VR
+Les jeux de réalité virtuelle peuvent être standalone ou sur PC, dans les deux cas la mention sera nécessaireJeux VR PCLe jeu doit suivre les mêmes règles de nommage qu'un jeu PC, avec le TAG [VR] au début. Exemple :
+
+[VR] MECHWARRIOR 5 : CLANS V1.0.132 / 20986587 BUILD [WIN X64 MULTI PORTABLE]
+
+[VR] Kayak VR Mirage v10602709 -ARMGDDN
+
+Les jeux VR standalone Exemple :
+
+[VR] Thief VR Legacy of Shadow (v25.11.25.33165) (NIF) (compatible firmware v76+)[Meta Quest2/Quest3/3S/Quest Pro]
+
+Jeux console : Sony, Microsoft, Nintendo
+
+La catégorie entière bénéficie d’une exception et n’est pas soumise au principe général d’uniformité typographique. Cette décision est motivée par la nécessité de lisibilité dans le catalogue qui serait entravé par le principe. En effet, le catalogue des jeux vidéo n'est pas destiné au parsing par les servarr (peut-être un jour et on s'adaptera ;)), pour cette raison, les règles de nommage sont plus flexibles
+
+Avant d'aller plus loin, il est nécessaire de consulter les modalités et contenu autorisé en cliquant ici
+Jeux sans tag
+Pour les jeux consoles, il est commun que les auteurs des releases aient été perdu au travers du temps; pour cette raison la mention de NOTAG est inutile car le NOTAG est la norme :)Pour cette raison lorsque la release, n'a aucun TAG, il faut s'y prendre comme ci-dessous : Format :
+
+[Console]Nom [Région - Langue] Type de Conteneur
+
+Exemple :
+
+[PS3]DJ Hero[EUR - MULTI] ISO
+
+[XBOX360]The Simpsons Game[PAL - FR] ISO
+
+[SWITCH] Dragon.Ball.FighterZ.Incl.All.Dlcs [EUR - MULTi] XCi
+
+[WiiU] The.Legend.Of.Zelda.Twilight.Princess.HD [EUR - MULTI] WUA
+
+Scene Release
+Le nom complet de la release doit être conservé pour que les peers qui rechercheraient la release, puisse la retrouver facilement ;) Exemple :
+
+[Switch] Disney_Dreamlight_Valley_Update_v1.20.2_NSW-SUXXORS.EU.MULTI[NSP]
+
+[XBOX360]The.Elder.Scrolls.IV.Oblivion.Edition.5e.Anniversaire.PAL.FR-SHADO1664
+
+REPACK
+
+Le même régime que pour les Scenes release s'applique :)
+PS4 et PS5
+Les jeux PS5 respectent les mêmes règles que les autres consoles, la différence étant l'ajout obligatoire de l'id (CUSA;PPSA)L'indication du firmware est fortement recommandée pour les jeux PS5 Format :
+
+[Console] Nom Version Firmware [Région - Langue]-ID
+
+Exemple :
+
+[PS5] God of War: Ragnarök (v05.005)[US - MULTI]-PPSA08329
+
+[PS4] Bloodborne: Game of the Year Edition (v1.09)[EUR - MULTI]-CUSA03173
+
+[PS5] MX vs ATV Legends (v1.0) 5.xx-4.xx [US - MULTI]-PPSA04734
+
+PACK et FULLSET
+1/ Même région
+
+[CONSOLE] Nom [Région - Langue] CONTENEUR
+
+Exemple :
+
+[3DS] Top 100 3DS compilation[EUR - MULTI] ZIP
+
+2/ Régions différentesFormat :
+
+[CONSOLE] NOM [[Région1-Région2-Région4] Langue] CONTENEUR
+
+Exemple :
+
+[DS] ALL GAMES RELEASED 2006-2015[[EUR-JP-US] MULTI] ZIP
+
+Applications et formations
+
+La catégorie entière bénéficie d’une exception et n’est pas soumise au principe général d’uniformité typographique. Cette décision est motivée par la nécessité de lisibilité dans le catalogue qui serait entravé par le principe. En effet, le catalogue des applications n'est pas destiné au parsing par les servarr (peut-être un jour et on s'adaptera ;)), pour cette raison, les règles de nommage sont plus flexibles
+
+Avant d'aller plus loin, il est nécessaire de consulter les modalités et contenu autorisé en cliquant ici
+Applications
+Format :
+
+Nom Version [OS Langue Type de release]
+
+Exemples :
+
+Google Earth Pro v.7.3.6.10441 [MACOS FR Crack]
+
+Spitfire Audio BBC Symphonie Orchestra Pro v1.5.0 [Win x64 Patch]
+
+Windows 11 Pro version 25H2 [Win x64 ISO]
+
+DaVinci Resolve Studio v20.0.0.49 [LINUX MULTI ISO]
+
+Cas particuliers : Les exceptions peuvent se cumuler entre elles :
+
+    DLC, plugin(s), extension etc :
+
+Format :
+
+ Nom Version (Nom du logiciel auquel se rapporte la release) [OS - Langue - Type de release]
+
+Exemple :
+
+Audio Imperia Klavier Player Edition KONTAKT [Win x64 FR Crack]
+
+    Release cross OS (=Sur plusieurs système en même temps) :
+
+Format :
+
+Nom Version [[OS1] [OS2] [Langue] [Type de release]]
+
+Exemple :
+
+Adobe InDesign 2026 v21.0.1-M0nkrus [[Win x64][LINUX] Multi Précracké]
+
+Si vous veniez à tomber sur une exception qui échappent aux règles établies, merci d’essayer de respecter les règles au maximum. La TP sera compréhensive et se nourrira de ces exceptions pour faire évoluer les règles.
+Applications Smartphone
+Format :
+
+[OS] Nom Version Langue [EXTENSION]
+
+Exemple :
+
+[Android] RadarBot v9.32.24 b383 Premium MULTI [APK]
+
+[Android] Waze_Magical Unicorn v5.15.0.2 Mod Multi [APK]
+
+[iOS] RadarBot v9.32.24 b383 Premium MULTI [IPA]
+
+Formations
+Format : Les règles à suivre sont les mêmes que celles de la catégorie Films et vidéos Exemple :
+
+Sébastien.Daviot.Maîtrisez.Excel.de.A.a.Z.le.cours.ULTIME.(IA.inclus).2025.TRUEFRENCH.1080p.WEB.x264
+
+Format :
+
+Editeur.Titre.Formation.Année.Format
+
+eBook
+
+Le nommage des eBooks repose sur une distinction simple mais déterminante : un titre peut être autonome, appartenir à une série, ou être publié sous forme de pack. Les modèles ci-dessous visent à rendre cette qualification immédiatement lisible, quel que soit le support, tout en conservant une cohérence de catalogue.
+eBook Audio, Bandes dessinées, manga, Comics, livres
+
+Avant d'aller plus loin, il est nécessaire de consulter les modalités et contenu autorisé en cliquant ici
+
+Pour choisir un format de nommage, il convient d’identifier la nature de l’ouvrage. Un eBook autonome ne se traite pas comme un tome de série, et un pack obéit à une logique encore différente, car il doit résumer un ensemble sans perdre en lisibilité.
+Titre unique
+RAPPEL : Un titre unique désigne une œuvre complète et autonome, publiée comme un volume indépendant. Elle ne fait pas partie d’une série et ne se décline pas en tomes, numéros, volumes ou épisodes. Format :
+
+Titre.Auteur.Langue.[Extension]-Team
+
+Exemple :
+
+Shutter.Island.Dennis.Lehane.FR.[PDF]-NOTAG
+
+Membre d'un ensemble
+RAPPEL : Un membre d’un ensemble correspond à une œuvre rattachée à une collection structurée. Il s’agit d’un élément identifié par une numérotation ou une place dans un cycle (tome, volume, opus, numéro, épisode, saga, série), et sa compréhension implique l’existence d’autres éléments liés.Format :
+
+Titre.Type d’ensemble.Auteur.Langue.[Extension]-Team
+
+Exemple :
+
+Andrzej.Sapkowski.The.Witcher.T00.La.Saison.Des.Orages.2025.FRENCH.[MP3.128.kbps]-COZY
+
+Chainsaw.Man.Tatsuki.Fujimoto.20.Tome.23.FR.[PDF]-NOTAG
+
+L'année est recommandée, mais non obligatoire. Elle est obligatoire lorsque le titre a plusieurs versions/reboot
+Pack d'eBook
+Un pack n’a pas vocation à répéter chaque détail dans le titre, mais à résumer clairement son périmètre. L’objectif est de rendre l’ensemble identifiable en un coup d’œil, tout en laissant au NFO et à la présentation le soin de lister le contenu de manière exhaustive.1. Lorsque l'ebook contient plusieurs membre d'ensembleL'[Auteur] n'est pas obligatoire, en raison d'une possibilité qu'il soit différent entre chaque ouvrage, néanmoins si l'auteur reste le même il est recommandé de l'indiquer. Format :
+
+Titre.[Ensemble contenu dans la release].Langue.[Extension]-Team
+
+Exemple :
+
+Lucky.Luke.(vu par...).[T01 à T07].2016-2025.FR.[PDF & CBZ]-NOTAG
+
+2. Lorsque l'eBook est une intégrale : Format :
+
+Titre.[INTEGRALE].Langue.[Extension]-[Team]
+
+Exemple :
+
+Adler.René.Sterne.[INTEGRALE].FR.[CBZ]-NOTAG
+
+3. Lorsque l'eBook est une Anthologie : Format :
+
+Auteur.[ANTHOLOGIE].Langue.[Extension]-[Team]
+
+Exemple :
+
+VICTOR.HUGO.[ANTHOLOGIE].FR.[EPUB]-NOTAG
+
+Presse, Magazine
+
+Avant d'aller plus loin, il est nécessaire de consulter les modalités et contenu autorisé en cliquant ici
+
+La presse obéit à une logique d’édition périodique. Ici, la date et la numérotation constituent des éléments d’identification aussi importants que le titre lui-même. Les formats suivants permettent d’éviter les doublons, les confusions d’édition et les incohérences de classement.
+Titre unique (Presse, Magazine)
+RAPPEL : Un titre unique désigne une œuvre complète et autonome, publiée comme un volume indépendant. Elle ne fait pas partie d’une série et ne se décline pas en tomes, numéros, volumes ou épisodes.Le rythme de parution devient obsolète dans ce cas.Format :
+
+Titre.Date.Langue.[Extension]-Team
+
+Exemple :
+
+Science.Et.Vie.2025-01.FRENCH.[PDF]-NOTAG
+
+Membre d'un ensemble (Presse, Magazine)
+RAPPEL : Un membre d’un ensemble correspond à une œuvre rattachée à une collection structurée. Il s’agit d’un élément identifié par une numérotation ou une place dans un cycle (tome, volume, opus, numéro, épisode, saga, série), et sa compréhension implique l’existence d’autres éléments liés.Format :
+
+Titre.Rythme de publication.Numéro.Date.Langue.[Extension]-Team
+
+Exemple :
+
+L’histoire.La.Corée.une.civilisation.deux.pays.Mensuel.N°385.Mars.2013.FR.[PDF]-NOTAG
+
+Pack d'eBook (Presse, Magazine)
+Les packs presse doivent indiquer explicitement l’étendue couverte, afin que l’on comprenne immédiatement quels numéros sont inclus. Cela facilite la vérification des doublons et la lecture du catalogue.1. Lorsque l'ebook contient plusieurs tomes, numéros etc..Format :
+
+Titre.[Ensemble contenu dans la release].Année.Langue.[Extension]-Team
+
+Exemple :
+
+Le.Fana.de.l.Aviation.Hors-Série.[collection.Aviation.Moderne N°1 à 17]-2013.FR.[PDF]-NOTAG
+
+2. Lorsque l'eBook est une intégrale :L'Année est recommandée mais n'est plus obligatoire sauf en cas d'homonymeFormat :
+
+Titre.[INTEGRALE].Langue.[Extension]-Team
+
+Exemple :
+
+National.Geographic.[INTEGRALE].FRENCH.[PDF]-NOTAG
+
+Émulation
+
+Avant d'aller plus loin, il est nécessaire de consulter les modalités et contenu autorisé en cliquant ici
+Consoles
+
+Il s'agit des mêmes règles que pour la catégorie des applications :)
+Jeux vidéo
+
+Il s'agit des mêmes règles que pour la catégorie des jeux vidéo :)
+GPS
+Dans cette catégorie, le nommage doit avant tout permettre une identification immédiate de la compatibilité. Une release GPS n’a de valeur que si l’on comprend, dès le titre, pour quelle marque ou quel écosystème elle est destinée, sur quelle zone elle porte, et à quelle version elle correspond.Avant d'aller plus loin, il est nécessaire de consulter les modalités et contenu autorisé en cliquant ici Format :
+
+Marque/éditeur.Zone.Année.Support
+
+Exemple :
+
+Radars.PSA.Europe.Decembre.2025.RNEG.WIPNAV.MYWAY
+
+Garmin.ign.bdtopo.map.UNLOCKED.FRANCE.V2022.12-R24.GARMIN
+
+Imprimante 3D
+Le nommage en impression 3D doit permettre d’identifier immédiatement le modèle et sa provenance, tout en rendant explicites les formats fournis. Cette structure favorise une recherche efficace, facilite la validation et évite les releases ambiguës.Avant d'aller plus loin, il est nécessaire de consulter les modalités et contenu autorisé en cliquant ici Format :
+
+Nom.source.format
+
+Exemple :
+
+EiffelTower.TurboSquid.FBX-OBJ-BLEND
+
+    Lorsqu'il s'agit d'un PACK
+
+Format :
+
+NomDuPack.Source.[PACK].Format
+
+Exemple :
+
+Miniature.Fantasy.Bundle.MyMiniFactory.[PACK].STL-3MF-BLEND
+
+Null
+
+Il n’existe pas de convention de nommage pour cette catégorie, la TP appréciera votre upload par le biais de la cohérence entre le nom de release et le contenu du torrent :)
+Adulte (-18)
+
+Pour les scènes et films de studios, l’objectif est de faire apparaître d’emblée l’origine (studio), l’identification du contenu et ses caractéristiques techniques. Cette lisibilité est essentielle pour l’indexation comme pour l’automatisation.
+
+Avant d'aller plus loin, il est nécessaire de consulter les modalités et contenu autorisé en cliquant ici
+Vidéo
+Format :
+
+[Studio].Titre.Acteur.Resolution.Codec
+
+Exemple :
+
+[BadoinkVR].2022.06.28.Kenna.James.Her.Biggest.Fan.7K.ENGLISH.WEB.AAC2.x265-Tarz
+
+[J&M.TV].Luna.25ans.Petite.Bombe.Au.Sourire.Très.Coquin.2026.FRENCH.WEB.1080p.x264-Flow
+
+[Nubile Films].2026.Dating.My.Stepson.4.WEB.1080p.AAC.2.0.x264-NoTag
+
+Cas particulier :Si catégorie autre qu'hétéro, il faut la préciser : Format :
+
+[Studio].Titre.Acteur.Catégorie.Resolution.Codec
+
+Pour les PACK :À partir du moment où plusieurs média figurent dans un torrent, il s'agit d'un pack.
+
+[Studio][PACK].Titre.Acteur.Resolution.Codec
+
+[PACK] Summer.Renee.VO.1080p.AAC.2.0.x265-NOTAG
+
+[LoveHerFeet][PACK] Siterip.2019-2024.VO.1080p.WEB.AAC.x265-NOTAG
+
+JAV (Japanese Adult Video)
+Le code référence est obligatoire : Format :
+
+JAV.[CODE].Titre.Romanise
+
+Exemple :
+
+JAV.[SSIS-123].Hikari_No_Yume
+
+Cas particulier :
+
+Si catégorie autre qu'hétéro, il faut la préciser :
+Format :
+
+JAV.[CODE].Titre.Catégorie.Romanise
+
+Hentai
+
+Vidéo : Même règles que pour les séries + TAG [HENTAI]
+Exemple :
+
+[HENTAI].Lingeries.Office.Fantasmes.Au.Bureau.S01.MULTI.VFF.576p.DVD.AC3.MPEG2-NOTAG
+
+[HENTAI].Ijirare.Fukushuu.Saimin.S01.2021.VOSTFR.720p.WEB.AAC.2.0.H264-NOTAG
+
+[HENTAI].Bible.Black.COLLECTION.VOSTFR.720p.WEB.AAC.2.0.H264-NOTAG
+
+Manga : Même règles que pour les eBook Manga
+Images
+Format :
+
+[Studio].Titre.Acteur.[Extension]-Tag
+
+Exemple :
+
+[ONLYFANS][PACK]SophieRaiin.[JPG]-NOTAG
+
+[Onlyfans][Fansly]jasminx.2020-2026[JPG][PNG]
+
+[WAREZ].Le.p2p.le.sodomise.Destroy.[JPG]-NOTAG
+
+Cas particulier :
+
+Si catégorie autre qu'hétéro, il faut la préciser :
+Format :
+
+[Studio].Titre.Acteur.Catégorie[Extension]-Tag
+
+[Brazzer].Titre.Acteur.GAY[Extension]-Tag
+
+Images
+
+Fonctionne avec les mêmes règles que les Magazines :)

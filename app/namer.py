@@ -1,0 +1,172 @@
+import re
+from typing import Dict, Any, Tuple, Optional
+
+try:
+    from unidecode import unidecode
+except ImportError:
+    import unicodedata
+    def unidecode(text: str) -> str:
+        return unicodedata.normalize('NFKD', text).encode('ascii', 'ignore').decode('utf-8')
+
+
+
+class ReleaseNamer:
+    # Known team or group regex at the end of filenames
+    TAG_REGEX = re.compile(r"-([A-Za-z0-9_]+)(?:\.[a-zA-Z0-9]+)?$")
+    
+    # Common video sources
+    SOURCES = ["BluRay", "BDRip", "BRRip", "WEB-DL", "WEBRip", "WEB", "HDTV", "DVDRip", "DVD", "REMUX", "UHD.BluRay"]
+    
+    # Known languages
+    LANG_TAGS = ["MULTI.TRUEFRENCH", "MULTI.VFF", "MULTI.VF2", "MULTI.VFQ", "MULTI.VFI", "MULTI.VOSTFR", "MULTI", "TRUEFRENCH", "VFF", "VF2", "VFQ", "VFI", "VOF", "VOSTFR", "FRENCH", "ENGLISH"]
+
+    @classmethod
+    def clean_title(cls, text: str) -> str:
+        """Removes accents, replaces spaces and underscores with dots, cleans illegal characters."""
+        # Unidecode accents (e.g. "é" -> "e", "œ" -> "oe")
+        ascii_text = unidecode(text)
+        # Replace spaces, dashes (except team dash), underscores with dots
+        cleaned = re.sub(r"[\s_\-]+", ".", ascii_text)
+        # Remove unwanted punctuation
+        cleaned = re.sub(r"[^\w\.]", "", cleaned)
+        # Collapse multiple dots
+        cleaned = re.sub(r"\.+", ".", cleaned).strip(".")
+        return cleaned
+
+    @classmethod
+    def extract_existing_tag(cls, filename: str) -> Tuple[Optional[str], str]:
+        """
+        Attempts to extract an existing release group/author tag from a filename.
+        Returns: (tag, filename_without_tag)
+        """
+        # Strip extension first
+        name_no_ext = filename
+        if "." in filename:
+            name_no_ext = ".".join(filename.split(".")[:-1])
+
+        # Match -TEAM at the end
+        match = re.search(r"-([A-Za-z0-9]+)$", name_no_ext)
+        if match:
+            tag = match.group(1)
+            # Exclude known false positives (e.g. -x264, -1080p, -H264)
+            if tag.lower() not in ["x264", "x265", "h264", "h265", "hevc", "avc", "1080p", "720p", "2160p", "aac"]:
+                base = name_no_ext[:match.start()]
+                return tag, base
+
+        return None, name_no_ext
+
+    @classmethod
+    def format_c411_title(
+        cls,
+        raw_name: str,
+        media_info: Dict[str, Any],
+        category: str = "Films & Vidéos",
+        custom_year: Optional[str] = None,
+        custom_source: Optional[str] = None,
+        custom_lang: Optional[str] = None,
+        custom_tag: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Generates a compliant C411 release name and validates anti-detag rules.
+        """
+        existing_tag, base_name = cls.extract_existing_tag(raw_name)
+        
+        # Anti-detag check:
+        # If an existing tag was present, it MUST be preserved.
+        chosen_tag = existing_tag if existing_tag else (custom_tag or "NOTAG")
+        detag_warning = None
+        if existing_tag:
+            detag_warning = f"Tag d'origine détecté : '{existing_tag}'. Il a été conservé conformément aux règles anti-DETAG de C411."
+        else:
+            detag_warning = "Aucun tag d'origine détecté. Par défaut, le suffixe '-NOTAG' est appliqué (conformément aux règles C411)."
+
+        # Year detection
+        year_match = re.search(r"\b(19\d\d|20\d\d)\b", raw_name)
+        year = custom_year or (year_match.group(1) if year_match else "")
+
+        # Resolution
+        resolution = media_info.get("resolution", "1080p")
+
+        # Source
+        source = custom_source or "WEB"
+        for s in cls.SOURCES:
+            if re.search(rf"\b{re.escape(s)}\b", raw_name, re.IGNORECASE):
+                source = s
+                break
+
+        # Video codec
+        video_codec = media_info.get("video_codec", "x264")
+
+        # Audio spec (e.g. EAC3.5.1, AC3.5.1, AAC.2.0, DTS.5.1)
+        audio_spec = "AAC.2.0"
+        audio_tracks = media_info.get("audio_tracks", [])
+        if audio_tracks:
+            first_audio = audio_tracks[0]
+            fmt = first_audio.get("format", "AAC").upper()
+            if "E-AC-3" in fmt or "EAC3" in fmt:
+                fmt_tag = "EAC3"
+            elif "AC-3" in fmt or "AC3" in fmt:
+                fmt_tag = "AC3"
+            elif "DTS-HD" in fmt:
+                fmt_tag = "DTS.HD.MA"
+            elif "DTS" in fmt:
+                fmt_tag = "DTS"
+            elif "TRUEHD" in fmt:
+                fmt_tag = "TrueHD"
+            elif "FLAC" in fmt:
+                fmt_tag = "FLAC"
+            else:
+                fmt_tag = "AAC"
+            
+            channels = first_audio.get("channels", "2.0")
+            audio_spec = f"{fmt_tag}.{channels}"
+
+        # HDR tags
+        hdr_tags = media_info.get("hdr_tags", [])
+        hdr_str = ".".join(hdr_tags) if hdr_tags else ""
+
+        # Language tag
+        lang_tag = custom_lang or media_info.get("detected_lang_tag", "MULTI.VFF")
+
+        # Extract title base
+        # Remove year, resolution, tags from base_name to isolate pure title
+        title_clean = base_name
+        if year:
+            title_clean = title_clean.split(year)[0]
+        # Clean title string
+        title_part = cls.clean_title(title_clean)
+        if not title_part:
+            title_part = "Release"
+
+        # Construct final title based on C411 schema:
+        # Nom.Année.Langue.Resolution.Source.[HDR].Audio.Video-TEAM
+        parts = [title_part]
+        if year:
+            parts.append(year)
+        if lang_tag:
+            parts.append(lang_tag)
+        if resolution and resolution != "Autre":
+            parts.append(resolution)
+        if source:
+            parts.append(source)
+        if hdr_str:
+            parts.append(hdr_str)
+        if audio_spec:
+            parts.append(audio_spec)
+        if video_codec:
+            parts.append(video_codec)
+
+        full_title = ".".join(parts) + f"-{chosen_tag}"
+
+        return {
+            "title": full_title,
+            "detected_tag": existing_tag,
+            "final_tag": chosen_tag,
+            "detag_warning": detag_warning,
+            "year": year,
+            "resolution": resolution,
+            "source": source,
+            "language": lang_tag,
+            "video_codec": video_codec,
+            "audio_spec": audio_spec
+        }

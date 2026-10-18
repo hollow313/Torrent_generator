@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="fr" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Torrent Generator - C411 & qBittorrent</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-layout">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="brand-logo"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+                <div class="brand-text">
+                    <h2>TorrentGen</h2>
+                    <span class="badge badge-c411">C411 Edition</span>
+                </div>
+            </div>
+
+            <nav class="nav-menu">
+                <button class="nav-item active" data-tab="explorer">
+                    <i class="fa-solid fa-folder-open"></i>
+                    <span>Explorateur</span>
+                </button>
+                <button class="nav-item" data-tab="generator">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    <span>Générateur</span>
+                </button>
+                <button class="nav-item" data-tab="history">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                    <span>Historique</span>
+                </button>
+                <button class="nav-item" data-tab="settings">
+                    <i class="fa-solid fa-sliders"></i>
+                    <span>Paramètres</span>
+                </button>
+            </nav>
+
+            <div class="sidebar-status">
+                <div class="status-card" id="sidebar-c411-status">
+                    <div class="status-indicator" id="c411-indicator"></div>
+                    <div class="status-info">
+                        <span class="status-title">C411 Tracker</span>
+                        <span class="status-sub" id="c411-status-text">Passkey prête</span>
+                    </div>
+                </div>
+                <div class="status-card" id="sidebar-qb-status">
+                    <div class="status-indicator" id="qb-indicator"></div>
+                    <div class="status-info">
+                        <span class="status-title">qBittorrent</span>
+                        <span class="status-sub" id="qb-status-text">Vérification...</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Topbar -->
+            <header class="topbar">
+                <div class="topbar-title">
+                    <h1 id="page-title">Explorateur de Médias</h1>
+                    <p class="subtitle" id="page-subtitle">Parcourez vos disques NAS et sélectionnez un média à uploader</p>
+                </div>
+                <div class="topbar-actions">
+                    <button class="btn btn-secondary btn-sm" id="btn-refresh-explorer">
+                        <i class="fa-solid fa-arrows-rotate"></i> Actualiser
+                    </button>
+                    <a href="https://c411.org/upload" target="_blank" class="btn btn-outline btn-sm">
+                        <i class="fa-solid fa-arrow-up-right-from-square"></i> C411 Upload
+                    </a>
+                </div>
+            </header>
+
+            <!-- Tab 1: File Explorer -->
+            <section class="tab-pane active" id="pane-explorer">
+                <div class="card mb-4">
+                    <div class="card-header flex justify-between items-center">
+                        <div class="breadcrumb-bar" id="explorer-breadcrumbs">
+                            <span class="breadcrumb-item"><i class="fa-solid fa-database"></i> /data</span>
+                        </div>
+                        <div class="explorer-quick-nav">
+                            <input type="text" id="quick-path-input" placeholder="Chemin direct..." class="input input-sm">
+                            <button class="btn btn-primary btn-sm" id="btn-go-path"><i class="fa-solid fa-arrow-right"></i></button>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-container">
+                            <table class="table" id="explorer-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 45%;">Nom</th>
+                                        <th style="width: 15%;">Taille</th>
+                                        <th style="width: 20%;">Modifié le</th>
+                                        <th style="width: 20%; text-align: right;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="explorer-list">
+                                    <tr>
+                                        <td colspan="4" class="text-center py-6 text-muted">
+                                            <i class="fa-solid fa-spinner fa-spin mr-2"></i> Chargement des fichiers...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tab 2: Generator & Review -->
+            <section class="tab-pane" id="pane-generator">
+                <!-- If no file is selected -->
+                <div id="generator-empty" class="card text-center py-12">
+                    <div class="empty-icon"><i class="fa-solid fa-film"></i></div>
+                    <h3>Aucun média sélectionné</h3>
+                    <p class="text-muted mb-4">Veuillez d'abord sélectionner un fichier ou dossier depuis l'onglet Explorateur.</p>
+                    <button class="btn btn-primary" onclick="switchTab('explorer')">
+                        <i class="fa-solid fa-folder-open mr-2"></i> Ouvrir l'Explorateur
+                    </button>
+                </div>
+
+                <!-- Generator Content -->
+                <div id="generator-content" style="display: none;">
+                    <!-- Media Overview Banner -->
+                    <div class="card mb-4 border-primary">
+                        <div class="card-body flex justify-between items-center flex-wrap gap-4">
+                            <div class="media-overview-info">
+                                <span class="badge badge-info mb-1" id="gen-media-type">Média</span>
+                                <h3 id="gen-source-filename" class="font-bold text-lg text-primary">--</h3>
+                                <p class="text-sm text-muted" id="gen-source-path">Chemin: --</p>
+                            </div>
+                            <div class="media-overview-stats flex gap-4">
+                                <div class="stat-box">
+                                    <span class="stat-label">Taille totale</span>
+                                    <span class="stat-value" id="gen-stat-size">--</span>
+                                </div>
+                                <div class="stat-box">
+                                    <span class="stat-label">Résolution</span>
+                                    <span class="stat-value" id="gen-stat-res">--</span>
+                                </div>
+                                <div class="stat-box">
+                                    <span class="stat-label">Codec Vidéo</span>
+                                    <span class="stat-value" id="gen-stat-video">--</span>
+                                </div>
+                                <div class="stat-box">
+                                    <span class="stat-label">Audio Principal</span>
+                                    <span class="stat-value" id="gen-stat-audio">--</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Grid Layout for Settings -->
+                    <div class="grid-2-col gap-4 mb-4">
+                        <!-- Left: Release Naming & Anti-DeTag -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3><i class="fa-solid fa-tag mr-2 text-primary"></i> Nommage de la Release (Normes C411)</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-group mb-3">
+                                    <label for="input-release-title" class="form-label flex justify-between">
+                                        <span>Titre officiel du Torrent (avec points)</span>
+                                        <span class="badge badge-success" id="badge-tag-status">TAG CONSERVÉ</span>
+                                    </label>
+                                    <input type="text" id="input-release-title" class="input input-lg font-mono">
+                                </div>
+
+                                <!-- Anti-Detag Warning Card -->
+                                <div class="alert alert-info mb-4" id="alert-detag-info">
+                                    <i class="fa-solid fa-shield-halved mr-2"></i>
+                                    <span id="text-detag-explanation">Règle C411 : Le tag original de la team est strictement conservé pour éviter tout DETAG.</span>
+                                </div>
+
+                                <div class="grid-2-col gap-3">
+                                    <div class="form-group">
+                                        <label class="form-label">Année</label>
+                                        <input type="text" id="input-year" class="input" placeholder="ex: 2024">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Langue / Audio Tag</label>
+                                        <input type="text" id="input-lang-tag" class="input" placeholder="ex: MULTI.VFF">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Source</label>
+                                        <select id="select-source" class="input">
+                                            <option value="WEB">WEB</option>
+                                            <option value="WEB-DL">WEB-DL</option>
+                                            <option value="WEBRip">WEBRip</option>
+                                            <option value="BluRay">BluRay</option>
+                                            <option value="REMUX">REMUX</option>
+                                            <option value="HDTV">HDTV</option>
+                                            <option value="DVDRip">DVDRip</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Team / Signature</label>
+                                        <input type="text" id="input-team-tag" class="input" placeholder="TEAM">
+                                    </div>
+                                </div>
+
+                                <div class="mt-3">
+                                    <button class="btn btn-secondary btn-sm" id="btn-recalc-title">
+                                        <i class="fa-solid fa-arrows-rotate mr-1"></i> Réactualiser le nom
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right: C411 Category & Duplicate Check -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3><i class="fa-solid fa-list-check mr-2 text-warning"></i> Catégorie C411 & Doublons</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-group mb-3">
+                                    <label class="form-label">Catégorie C411</label>
+                                    <select id="select-category" class="input input-lg">
+                                        {% for main_cat in categories %}
+                                            <optgroup label="{{ main_cat.name }}">
+                                                {% for sub in main_cat.sub %}
+                                                    <option value="{{ sub.id }}">{{ sub.name }} (ID: {{ sub.id }})</option>
+                                                {% endfor %}
+                                            </optgroup>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+
+                                <div class="form-group mb-4">
+                                    <label class="form-label">Taille des pièces (Règle stricte C411)</label>
+                                    <div class="flex gap-2">
+                                        <select id="select-piece-size" class="input">
+                                            <option value="1048576">1 Mo (&lt; 1 Go)</option>
+                                            <option value="2097152">2 Mo (&lt; 2 Go)</option>
+                                            <option value="4194304">4 Mo (&lt; 3 Go)</option>
+                                            <option value="8388608">8 Mo (&lt; 8 Go)</option>
+                                            <option value="16777216" selected>16 Mo (&gt; 8 Go)</option>
+                                        </select>
+                                        <span class="badge badge-primary flex items-center px-3" id="badge-piece-calc">Calculé C411</span>
+                                    </div>
+                                </div>
+
+                                <!-- TMDB Lookup Row -->
+                                <div class="form-group mb-3">
+                                    <label class="form-label">Recherche Métadonnées TMDB (Synopsis & Affiche)</label>
+                                    <div class="flex gap-2">
+                                        <input type="text" id="tmdb-search-input" class="input" placeholder="Titre pour TMDB...">
+                                        <button class="btn btn-secondary" id="btn-search-tmdb">
+                                            <i class="fa-solid fa-magnifying-glass"></i> TMDB
+                                        </button>
+                                    </div>
+                                    <input type="hidden" id="tmdb-id-val">
+                                    <input type="hidden" id="imdb-id-val">
+                                    <input type="hidden" id="poster-url-val">
+                                </div>
+
+                                <!-- Live Duplicate Check on C411 -->
+                                <div class="duplicate-check-box p-3 rounded border border-dark">
+                                    <div class="flex justify-between items-center mb-2">
+                                        <span class="font-semibold text-sm">Vérification de présence sur C411 :</span>
+                                        <button class="btn btn-outline btn-xs" id="btn-check-c411">
+                                            <i class="fa-solid fa-satellite-dish mr-1"></i> Vérifier doublons
+                                        </button>
+                                    </div>
+                                    <div id="duplicate-results" class="text-xs text-muted">
+                                        Cliquez sur "Vérifier doublons" pour vérifier si ce contenu existe déjà sur C411.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TMDB Selection Modal / Box -->
+                    <div id="tmdb-results-container" class="card mb-4" style="display: none;">
+                        <div class="card-header flex justify-between items-center">
+                            <h4><i class="fa-solid fa-film text-primary mr-2"></i> Résultats TMDB</h4>
+                            <button class="btn btn-xs btn-outline" onclick="document.getElementById('tmdb-results-container').style.display='none'">Fermer</button>
+                        </div>
+                        <div class="card-body">
+                            <div class="grid-tmdb-cards" id="tmdb-cards-list"></div>
+                        </div>
+                    </div>
+
+                    <!-- NFO & BBCode Editors Tabs -->
+                    <div class="card mb-4">
+                        <div class="card-header flex justify-between items-center p-0 px-4">
+                            <div class="tab-subnav flex">
+                                <button class="subtab-btn active" data-subtab="sub-nfo">
+                                    <i class="fa-solid fa-file-lines mr-1"></i> Fichier .NFO (Généré)
+                                </button>
+                                <button class="subtab-btn" data-subtab="sub-bbcode">
+                                    <i class="fa-solid fa-code mr-1"></i> Description BBCode (C411)
+                                </button>
+                            </div>
+                            <div class="flex gap-2 py-2">
+                                <button class="btn btn-xs btn-outline" id="btn-copy-active-editor">
+                                    <i class="fa-regular fa-copy"></i> Copier
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body p-3">
+                            <!-- NFO Subtab -->
+                            <div class="subtab-content active" id="sub-nfo">
+                                <textarea id="editor-nfo" class="code-editor" rows="16" spellcheck="false"></textarea>
+                            </div>
+                            <!-- BBCode Subtab -->
+                            <div class="subtab-content" id="sub-bbcode">
+                                <textarea id="editor-bbcode" class="code-editor" rows="16" spellcheck="false"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Bottom Action Bar -->
+                    <div class="action-footer card p-4 flex justify-between items-center flex-wrap gap-4">
+                        <div class="flex items-center gap-3">
+                            <button class="btn btn-primary btn-lg" id="btn-generate-torrent">
+                                <i class="fa-solid fa-file-circle-plus mr-2"></i> 1. Créer le Torrent & NFO
+                            </button>
+                            <button class="btn btn-success btn-lg" id="btn-upload-c411" disabled>
+                                <i class="fa-solid fa-cloud-arrow-up mr-2"></i> 2. Uploader sur C411
+                            </button>
+                            <button class="btn btn-info btn-lg" id="btn-send-qbittorrent" disabled>
+                                <i class="fa-solid fa-seedling mr-2"></i> 3. Envoyer à qBittorrent
+                            </button>
+                        </div>
+                        <div class="flex items-center gap-2" id="download-actions" style="display: none;">
+                            <a id="btn-dl-torrent" href="#" class="btn btn-secondary">
+                                <i class="fa-solid fa-download mr-1"></i> .torrent
+                            </a>
+                            <a id="btn-dl-nfo" href="#" class="btn btn-secondary">
+                                <i class="fa-solid fa-file-arrow-down mr-1"></i> .nfo
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tab 3: History -->
+            <section class="tab-pane" id="pane-history">
+                <div class="card">
+                    <div class="card-header flex justify-between items-center">
+                        <h3><i class="fa-solid fa-clock-rotate-left mr-2"></i> Historique des Torrents Générés</h3>
+                        <button class="btn btn-sm btn-secondary" id="btn-refresh-history">
+                            <i class="fa-solid fa-arrows-rotate"></i> Actualiser
+                        </button>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-container">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Nom de la release</th>
+                                        <th>Taille</th>
+                                        <th>Statut C411</th>
+                                        <th>qBittorrent</th>
+                                        <th style="text-align: right;">Téléchargement</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="history-list">
+                                    <tr>
+                                        <td colspan="6" class="text-center py-6 text-muted">Aucun torrent généré pour le moment.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tab 4: Settings -->
+            <section class="tab-pane" id="pane-settings">
+                <div class="grid-2-col gap-4">
+                    <!-- C411 Settings -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fa-solid fa-shield mr-2 text-primary"></i> Identifiants C411</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-group mb-3">
+                                <label class="form-label flex justify-between">
+                                    <span>Votre Passkey C411</span>
+                                    <small class="text-muted">32 caractères hexadécimaux</small>
+                                </label>
+                                <input type="password" id="cfg-c411-passkey" class="input font-mono" placeholder="ex: ef7017d2a81f36f7c1dcb1f89e504e39">
+                                <small class="form-hint">Trouvable sur votre profil C411 (URL d'annonce personnelle).</small>
+                            </div>
+
+                            <div class="form-group mb-3">
+                                <label class="form-label flex justify-between">
+                                    <span>Clé API C411</span>
+                                    <a href="https://c411.org/user/integrations" target="_blank" class="text-primary text-xs">
+                                        Obtenir clé API C411 <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                                    </a>
+                                </label>
+                                <input type="password" id="cfg-c411-apikey" class="input font-mono" placeholder="Clé API générée depuis C411">
+                                <small class="form-hint">Nécessaire pour la vérification automatique des doublons et l'upload direct.</small>
+                            </div>
+
+                            <div class="form-group mb-3">
+                                <label class="form-label">URL de base C411</label>
+                                <input type="text" id="cfg-c411-baseurl" class="input" value="https://c411.org">
+                            </div>
+
+                            <div class="form-group mb-3">
+                                <label class="form-label">Tracker Principal (Announce)</label>
+                                <input type="text" id="cfg-c411-announce-primary" class="input font-mono" value="https://c411.org/announce/">
+                            </div>
+
+                            <div class="form-group mb-3">
+                                <label class="form-label">Tracker de Secours (Announce Backup)</label>
+                                <input type="text" id="cfg-c411-announce-backup" class="input font-mono" value="https://tk.c411.tw/announce/">
+                                <small class="form-hint">Conforme à la documentation officielle C411 de bascule automatique.</small>
+                            </div>
+
+                            <div class="form-group mb-4">
+                                <label class="form-label">Tag par défaut (si release sans tag original)</label>
+                                <input type="text" id="cfg-c411-default-tag" class="input" value="NOTAG">
+                                <small class="form-hint">Les règles C411 imposent le suffixe -NOTAG si aucun tag n'est connu.</small>
+                            </div>
+
+                            <button class="btn btn-secondary btn-sm" id="btn-test-c411">
+                                <i class="fa-solid fa-satellite-dish mr-1"></i> Tester l'API C411
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- qBittorrent & Paths Settings -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fa-solid fa-server mr-2 text-success"></i> qBittorrent & Chemins NAS</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-group mb-3">
+                                <label class="form-label">URL Web UI qBittorrent</label>
+                                <input type="text" id="cfg-qb-url" class="input" placeholder="http://192.168.1.100:8080 ou http://qbittorrent:8080">
+                            </div>
+
+                            <div class="grid-2-col gap-3 mb-3">
+                                <div class="form-group">
+                                    <label class="form-label">Utilisateur</label>
+                                    <input type="text" id="cfg-qb-user" class="input" value="admin">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Mot de passe</label>
+                                    <input type="password" id="cfg-qb-pass" class="input" placeholder="Mot de passe qBittorrent">
+                                </div>
+                            </div>
+
+                            <div class="border-t border-dark pt-3 mt-3">
+                                <h4>Mappage des chemins (Crucial pour reseed instantané)</h4>
+                                <p class="text-xs text-muted mb-3">
+                                    Permet à qBittorrent de trouver immédiatement le fichier sur le NAS sans le re-télécharger.
+                                </p>
+
+                                <div class="form-group mb-2">
+                                    <label class="form-label text-xs">Chemin dans ce container :</label>
+                                    <input type="text" id="cfg-qb-map-from" class="input font-mono text-sm" value="/data">
+                                </div>
+
+                                <div class="form-group mb-3">
+                                    <label class="form-label text-xs">Chemin équivalent dans qBittorrent / NAS :</label>
+                                    <input type="text" id="cfg-qb-map-to" class="input font-mono text-sm" value="/mnt/Plex/Plex/films">
+                                </div>
+                            </div>
+
+                            <div class="grid-2-col gap-3 mb-3">
+                                <div class="form-group">
+                                    <label class="form-label">Catégorie qB</label>
+                                    <input type="text" id="cfg-qb-category" class="input" value="c411">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Tags qB</label>
+                                    <input type="text" id="cfg-qb-tags" class="input" value="c411,upload">
+                                </div>
+                            </div>
+
+                            <div class="form-group mb-4">
+                                <label class="form-label">Clé API TMDB (Optionnelle)</label>
+                                <input type="password" id="cfg-tmdb-key" class="input" placeholder="Clé API v3 TMDB">
+                            </div>
+
+                            <button class="btn btn-secondary btn-sm" id="btn-test-qb">
+                                <i class="fa-solid fa-plug mr-1"></i> Tester la connexion qBittorrent
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mt-4 p-4 flex justify-between items-center">
+                    <div>
+                        <h4 class="font-bold">Enregistrer les modifications</h4>
+                        <p class="text-xs text-muted">Les paramètres sont persistés dans le volume /config/config.json.</p>
+                    </div>
+                    <button class="btn btn-primary btn-lg" id="btn-save-settings">
+                        <i class="fa-solid fa-floppy-disk mr-2"></i> Enregistrer la Configuration
+                    </button>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Notification Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

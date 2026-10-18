@@ -1,0 +1,122 @@
+Évaluation & Statut Uploader
+
+L'évaluation de votre upload est effectué par une équipe de modération composée d'Uploaders certifiés et de spécialistes du formalisme, elle se nomme la Team Pending ;)
+La Team Pending
+
+La Team Pending (TP) est l'équipe de modération chargée de vérifier et de valider tout les uploads soumis par les membres.
+
+    Rôle de la Team Pending :
+
+        Vérifier la conformité des uploads aux règlesDétecter et supprimer les doublons
+
+        S'assurer de la qualité des présentations et NFO
+
+        Valider ou demander des corrections
+
+        Protéger la communauté des contenus malveillants
+
+    Fonctionnement :
+
+        Vous uploadez votre torrent → il entre en zone PendingUn membre de la TP examine votre upload
+
+        Trois réponses possibles :
+
+            Validation : votre torrent devient publicCorrection demandée : vous avez 48h pour corriger
+
+                Motifs :
+
+                    Défaut de conformité
+
+                    Aucun seed
+
+                    DeTAG/ReTAG
+
+            Refus
+
+                Motifs:
+
+                    Contenu strictement interditDoublon
+
+                    Aucun seed
+
+                    Aucune correction après expiration du délai
+
+                    Défaut de conformité
+
+                    DeTAG/ReTAG
+
+            Bannissement : Si votre torrent contient du contenu malveillant
+
+RAPPEL : L'objectif de la TP est de vous aider ! Son objectif sera toujours de vous accompagner pour ajuster votre upload afin d'être conforme aux standards ;)
+Le statut Uploader Certifié
+
+"Dans l'Empire du p2p, les Uploaders initient, les Seeders pérennisent — et la Communauté prospère"
+
+Le statut Uploader Certifié est une distinction accordée aux Uploaders ayant démontré, dans la durée, leur capacité à publier des releases régulières et irréprochables.
+
+Leur rigueur fait loi, leur constance fait référence : ils appliquent les standards avec une précision redoutable, et portent l’exigence là où elle compte : dans chaque release.
+
+    Avantages :
+
+        Les uploads ne passent plus par le Pending dans la catégorie où l'uploader est certifié
+
+        Publication immédiate des torrents
+
+        Modifications sans retour en Pending
+
+        Reconnaissance de la distinction dans la communauté
+
+        Possibilité de rejoindre la TP sur demande
+
+        D'autres avantages disponibles prochainement..
+
+    Responsabilités de l'Uploader Certifié
+
+        Uploads irréprochables
+
+        Attitude exemplaire
+
+    Déchéance du statut de l'Uploader Certifié
+
+        5 erreurs consécutives d'uploads suffisent pour perdre son statut
+
+            Ceci arrive très rarement ;)
+
+Paliers de l'uploadeur
+
+La certification s'obtient catégorie par catégorie, et non une fois pour tout le site. Vous pouvez être Certifié en Audio tout en restant débutant en Films & Vidéos.
+
+Le critère est unique : le nombre de vos uploads validés par la Team Pending dans cette catégorie. Les octets partagés n'entrent pas dans le calcul.
+
+Le palier atteint détermine aussi le nombre de torrents que vous pouvez laisser simultanément en attente de validation dans cette catégorie :
+Palier	Uploads validés dans la catégorie	Torrents en attente autorisés
+Novice	0	1
+Apprenti	5	5
+Confirmé	10	10
+Certifié	15	illimité
+
+Ces valeurs sont les seuils appliqués aujourd'hui dans toutes les catégories. Chaque catégorie a son propre seuil, réglable par le staff : la valeur qui vous concerne et votre progression sont affichées sur votre page Mes certifications.
+
+Être Certifié dans une catégorie vous fait publier sans passer par le Pending dans cette catégorie uniquement. Vos uploads dans les autres catégories restent soumis à la validation de la Team Pending tant que vous n'y êtes pas certifié à votre tour.
+
+    Note : seuls les torrents validés comptent. Les torrents refusés ou supprimés ne sont pas comptabilisés, et le compteur redescend si l'un de vos torrents validés est retiré. Si votre compteur repasse sous le seuil de la catégorie, la certification y est automatiquement retirée et vos uploads y repassent par le Pending.
+
+Conseils pour progresser
+
+    Lisez attentivement les règles avant votre premier upload
+
+    Soignez vos présentations - c'est votre vitrine
+
+    NFO complet à chaque fois
+
+    Restez en seed le temps nécessaire
+
+    Vérifiez les doublons avant d'uploader
+
+    Qualité > Quantité - mieux vaut 5 uploads parfaits que 20 bâclés
+
+    Répondez rapidement aux demandes de correction
+
+Pour en savoir plus, n'hésitez pas à consulter le Guide de l'Uploader dans son entièreté ;)
+
+Bonne continuation et merci pour votre contribution à la communauté !

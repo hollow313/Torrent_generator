@@ -1,0 +1,20 @@
+services:
+  torrent-generator:
+    image: hollow313/torrent-generator:latest
+    container_name: torrent-generator
+    restart: unless-stopped
+    ports:
+      - "30017:30017"
+    environment:
+      - PORT=30017
+      - TZ=Europe/Paris
+      - CONFIG_DIR=/config
+      - DATA_DIR=/data
+      - OUTPUT_DIR=/output
+    volumes:
+      # Persistent configuration & history
+      - ./config:/config
+      # Media directory on your NAS (e.g. Plex films)
+      - /mnt/Plex/Plex/films:/data:ro
+      # Output directory for generated .torrent and .nfo files
+      - ./torrents:/output
