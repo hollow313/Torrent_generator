@@ -83,19 +83,40 @@ Accédez à l'interface web : `http://<IP_DU_SERVEUR>:30017`
 
 ---
 
-## ⚙️ Configuration via l'interface Web
+## ⚙️ Configuration
 
-Rendez-vous dans l'onglet **Paramètres** de l'interface web :
+Vous pouvez configurer l'application de deux façons :
+1. **Directement depuis l'interface web** dans l'onglet **Paramètres** (avec boutons de test de connexion en direct pour C411 et qBittorrent).
+2. **Ou via le fichier `config.json`** en copiant `config.json.example` vers `./config/config.json` avant de démarrer le conteneur.
 
-1. **Passkey C411** : Renseignez votre passkey personnelle (trouvable sur votre profil C411).
-2. **Clé API C411** : Récupérez votre clé API sur [C411 Intégrations API](https://c411.org/user/integrations).
-3. **Client Torrent** :
-   - URL : `http://<IP_CLIENT>:<PORT>/` (l'adresse de votre client de téléchargement)
-   - Utilisateur & Mot de passe
-   - **Mappage de chemins** :
-     - Chemin dans ce container : `/data`
-     - Chemin équivalent sur votre serveur : le chemin absolu où se trouvent vos médias
-4. **TMDB (Optionnel)** : Renseignez votre clé API TMDB v3 pour l'import automatique des affiches et résumés.
+### 📋 Variables du fichier `config.json`
+
+| Variable | Statut | Valeur par défaut | Description |
+| :--- | :---: | :---: | :--- |
+| `web_port` | **Optionnel** | `30017` | Port d'écoute du serveur web dans le conteneur. |
+| `data_dir` | **Optionnel** | `"/data"` | Dossier racine où sont montés vos médias dans le conteneur. |
+| `output_dir` | **Optionnel** | `"/output"` | Dossier où sont enregistrés les fichiers `.torrent` et `.nfo` générés. |
+| `c411_passkey` | **OBLIGATOIRE** | `""` | Votre passkey personnelle de 32 caractères C411 (disponible sur votre profil C411). Indispensable pour générer les URL de trackers valides dans les fichiers `.torrent`. |
+| `c411_api_key` | **OBLIGATOIRE** | `""` | Votre clé API C411 (sur [C411 Intégrations API](https://c411.org/user/integrations)). Nécessaire pour la vérification automatique des doublons (Torznab) et l'upload direct. |
+| `c411_base_url` | **Optionnel** | `"https://c411.org"` | URL de base du site C411. |
+| `c411_announce_primary` | **Optionnel** | `"https://c411.org/announce/"` | URL du tracker d'annonce principal. |
+| `c411_announce_backup` | **Optionnel** | `"https://tk.c411.tw/announce/"` | URL du tracker d'annonce de secours (conforme aux spécifications C411). |
+| `c411_default_tag` | **Optionnel** | `"NOTAG"` | Tag par défaut appliqué si aucun tag de team n'est détecté dans le média (obligatoire selon les règles anti-detag C411). |
+| `c411_anonymous` | **Optionnel** | `false` | Publier les torrents en mode anonyme sur C411 (`true` ou `false`). |
+| `qbittorrent_enabled` | **Optionnel** | `true` | Active (`true`) ou désactive (`false`) l'injection automatique dans le client de téléchargement. |
+| `qbittorrent_url` | **OBLIGATOIRE\*** | `""` | Adresse WebUI de votre client qBittorrent (ex: `http://192.168.1.50:8080/`). (\*Obligatoire si `qbittorrent_enabled: true`). |
+| `qbittorrent_username` | **Optionnel** | `"admin"` | Nom d'utilisateur pour se connecter à l'interface de qBittorrent. |
+| `qbittorrent_password` | **Optionnel** | `""` | Mot de passe de votre client de téléchargement (laissé vide si aucune authentification requise). |
+| `qbittorrent_category` | **Optionnel** | `"c411"` | Catégorie assignée automatiquement au torrent injecté dans qBittorrent. |
+| `qbittorrent_tags` | **Optionnel** | `"c411,upload"` | Tags appliqués au torrent dans qBittorrent (séparés par des virgules). |
+| `qbittorrent_path_mapping_from` | **Optionnel** | `"/data"` | Chemin des fichiers tel que vu dans le conteneur Torrent Generator. |
+| `qbittorrent_path_mapping_to` | **OBLIGATOIRE\*** | `""` | Chemin réel complet des fichiers tel que vu par votre client qBittorrent sur le serveur (ex: `/chemin/reel/sur/serveur`). Indispensable pour que le client trouve le fichier et démarre le seed à 100% instantanément sans retéléchargement. |
+| `qbittorrent_start_paused` | **Optionnel** | `false` | Si `true`, le torrent est injecté en pause. Si `false`, il commence directement le contrôle d'intégrité et le seed. |
+| `tmdb_api_key` | **Optionnel** | `""` | Clé API v3 gratuite The Movie Database. Permet l'import automatique des affiches officielles (posters) et résumés en français pour la présentation BBCode. |
+| `piece_size_mode` | **Optionnel** | `"auto"` | Mode de calcul de la taille des pièces du torrent (`"auto"` applique strictement l'échelle officielle C411 : 1Mo à 16Mo selon la taille totale). |
+
+> [!NOTE]
+> Tous ces paramètres peuvent être modifiés à tout moment directement depuis l'interface Web dans l'onglet **Paramètres** sans avoir à redémarrer le conteneur.
 
 ---
 

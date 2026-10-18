@@ -76,6 +76,7 @@ class ConfigUpdateModel(BaseModel):
     qbittorrent_path_mapping_to: str
     qbittorrent_start_paused: bool
     tmdb_api_key: Optional[str] = ""
+    piece_size_mode: Optional[str] = "auto"
 
 class AnalyzeRequest(BaseModel):
     path: str

@@ -1,0 +1,26 @@
+{
+  "web_port": 30017,
+  "data_dir": "/data",
+  "output_dir": "/output",
+
+  "c411_passkey": "VOTRE_PASSKEY_C411_32_CARACTERES",
+  "c411_api_key": "VOTRE_CLE_API_C411",
+  "c411_base_url": "https://c411.org",
+  "c411_announce_primary": "https://c411.org/announce/",
+  "c411_announce_backup": "https://tk.c411.tw/announce/",
+  "c411_default_tag": "NOTAG",
+  "c411_anonymous": false,
+
+  "qbittorrent_enabled": true,
+  "qbittorrent_url": "http://IP_DE_VOTRE_CLIENT:PORT/",
+  "qbittorrent_username": "admin",
+  "qbittorrent_password": "VOTRE_MOT_DE_PASSE",
+  "qbittorrent_category": "c411",
+  "qbittorrent_tags": "c411,upload",
+  "qbittorrent_path_mapping_from": "/data",
+  "qbittorrent_path_mapping_to": "/chemin/reel/sur/votre/serveur",
+  "qbittorrent_start_paused": false,
+
+  "tmdb_api_key": "VOTRE_CLE_API_TMDB_OPTIONNELLE",
+  "piece_size_mode": "auto"
+}
