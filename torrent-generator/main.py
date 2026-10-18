@@ -128,12 +128,21 @@ class TmdbSearchRequest(BaseModel):
     year: Optional[str] = None
     media_type: str = "movie"
 
+def render_template(template_name: str, request: Request, context: Optional[Dict[str, Any]] = None):
+    ctx = dict(context or {})
+    ctx["request"] = request
+    try:
+        # Starlette >= 0.36 (request as keyword / first arg)
+        return templates.TemplateResponse(request=request, name=template_name, context=ctx)
+    except TypeError:
+        # Starlette < 0.36 (name as first arg)
+        return templates.TemplateResponse(name=template_name, context=ctx)
+
 # Routes
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     config = get_config()
-    return templates.TemplateResponse("index.html", {
-        "request": request,
+    return render_template("index.html", request, {
         "config": config,
         "categories": C411_CATEGORIES
     })
