@@ -76,10 +76,10 @@ function switchTab(tabId) {
 
     // Dynamic titles
     const titles = {
-        explorer: ["Explorateur de Médias", "Parcourez vos disques NAS et sélectionnez un média à uploader"],
+        explorer: ["Explorateur de Médias", "Parcourez vos disques du serveur et sélectionnez un média à uploader"],
         generator: ["Générateur & Vérification", "Vérifiez les règles C411, générez NFO et Torrent puis uploadez"],
         history: ["Historique", "Consultez et téléchargez vos torrents précédemment générés"],
-        settings: ["Paramètres", "Configurez vos accès C411, qBittorrent et les chemins de disques"]
+        settings: ["Paramètres", "Configurez vos accès C411, client torrent et les chemins de disques"]
     };
     if (titles[tabId]) {
         document.getElementById("page-title").textContent = titles[tabId][0];
@@ -752,7 +752,7 @@ async function loadSettings() {
         document.getElementById("cfg-qb-user").value = cfg.qbittorrent_username || "admin";
         document.getElementById("cfg-qb-pass").value = cfg.qbittorrent_password || "";
         document.getElementById("cfg-qb-map-from").value = cfg.qbittorrent_path_mapping_from || "/data";
-        document.getElementById("cfg-qb-map-to").value = cfg.qbittorrent_path_mapping_to || "/mnt/Plex/Plex/films";
+        document.getElementById("cfg-qb-map-to").value = cfg.qbittorrent_path_mapping_to || "";
         document.getElementById("cfg-qb-category").value = cfg.qbittorrent_category || "c411";
         document.getElementById("cfg-qb-tags").value = cfg.qbittorrent_tags || "c411,upload";
 

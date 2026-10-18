@@ -65,7 +65,7 @@
             <header class="topbar">
                 <div class="topbar-title">
                     <h1 id="page-title">Explorateur de Médias</h1>
-                    <p class="subtitle" id="page-subtitle">Parcourez vos disques NAS et sélectionnez un média à uploader</p>
+                    <p class="subtitle" id="page-subtitle">Parcourez vos disques du serveur et sélectionnez un média à uploader</p>
                 </div>
                 <div class="topbar-actions">
                     <button class="btn btn-secondary btn-sm" id="btn-refresh-explorer">
@@ -468,15 +468,15 @@
                         </div>
                     </div>
 
-                    <!-- qBittorrent & Paths Settings -->
+                    <!-- Torrent Client & Paths Settings -->
                     <div class="card">
                         <div class="card-header">
-                            <h3><i class="fa-solid fa-server mr-2 text-success"></i> qBittorrent & Chemins NAS</h3>
+                            <h3><i class="fa-solid fa-server mr-2 text-success"></i> Client Torrent & Chemins Serveur</h3>
                         </div>
                         <div class="card-body">
                             <div class="form-group mb-3">
-                                <label class="form-label">URL Web UI qBittorrent</label>
-                                <input type="text" id="cfg-qb-url" class="input" placeholder="http://192.168.1.100:8080 ou http://qbittorrent:8080">
+                                <label class="form-label">URL Web UI du Client Torrent</label>
+                                <input type="text" id="cfg-qb-url" class="input" placeholder="http://ip-client:port">
                             </div>
 
                             <div class="grid-2-col gap-3 mb-3">
@@ -486,14 +486,14 @@
                                 </div>
                                 <div class="form-group">
                                     <label class="form-label">Mot de passe</label>
-                                    <input type="password" id="cfg-qb-pass" class="input" placeholder="Mot de passe qBittorrent">
+                                    <input type="password" id="cfg-qb-pass" class="input" placeholder="Mot de passe">
                                 </div>
                             </div>
 
                             <div class="border-t border-dark pt-3 mt-3">
                                 <h4>Mappage des chemins (Crucial pour reseed instantané)</h4>
                                 <p class="text-xs text-muted mb-3">
-                                    Permet à qBittorrent de trouver immédiatement le fichier sur le NAS sans le re-télécharger.
+                                    Permet au client torrent de trouver immédiatement le fichier sur le serveur sans le re-télécharger.
                                 </p>
 
                                 <div class="form-group mb-2">
@@ -502,8 +502,8 @@
                                 </div>
 
                                 <div class="form-group mb-3">
-                                    <label class="form-label text-xs">Chemin équivalent dans qBittorrent / NAS :</label>
-                                    <input type="text" id="cfg-qb-map-to" class="input font-mono text-sm" value="/mnt/Plex/Plex/films">
+                                    <label class="form-label text-xs">Chemin équivalent sur votre serveur :</label>
+                                    <input type="text" id="cfg-qb-map-to" class="input font-mono text-sm" placeholder="ex: /mnt/donnees/medias">
                                 </div>
                             </div>
 

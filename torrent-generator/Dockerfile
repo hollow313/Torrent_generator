@@ -27,7 +27,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt && \
     apk del gcc musl-dev linux-headers
 
-# Create TrueNAS apps user/group (UID 568, GID 568)
+# Create apps user/group (UID 568, GID 568)
 RUN addgroup -g 568 apps && \
     adduser -u 568 -G apps -s /bin/sh -D apps
 

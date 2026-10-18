@@ -15,7 +15,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up QEMU (Multi-platform support for NAS)
+      - name: Set up QEMU (Multi-platform support: amd64/arm64)
         uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx

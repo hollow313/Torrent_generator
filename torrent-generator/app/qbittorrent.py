@@ -9,7 +9,7 @@ class QBittorrentClient:
         username: str = "",
         password: str = "",
         mapping_from: str = "/data",
-        mapping_to: str = "/mnt/Plex/Plex/films",
+        mapping_to: str = "",
         category: str = "c411",
         tags: str = "c411,upload"
     ):
@@ -23,8 +23,8 @@ class QBittorrentClient:
 
     def translate_path(self, local_path: str) -> str:
         """
-        Translates a local path inside the generator container into the path expected by qBittorrent.
-        For example: /data/Films/Movie.mkv -> /mnt/Plex/Plex/films/Movie.mkv
+        Translates a local path inside the generator container into the path expected by the torrent client.
+        For example: /data/films/Movie.mkv -> /chemin/serveur/films/Movie.mkv
         """
         normalized_local = local_path.replace("\\", "/")
         norm_from = self.mapping_from.replace("\\", "/").rstrip("/")

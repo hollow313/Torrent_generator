@@ -13,9 +13,9 @@ services:
       - DATA_DIR=/data
       - OUTPUT_DIR=/output
     volumes:
-      # Persistent configuration & history
+      # Configuration persistante (paramètres et historique)
       - ./config:/config
-      # Media directory on your NAS (e.g. Plex films)
-      - /mnt/Plex/Plex/films:/data:ro
-      # Output directory for generated .torrent and .nfo files
+      # Dossier racine de vos médias sur le serveur
+      - /chemin/vers/vos/medias:/data:ro
+      # Dossier où seront enregistrés les fichiers .torrent et .nfo générés
       - ./torrents:/output

@@ -23,15 +23,15 @@ class AppConfig(BaseModel):
     c411_default_tag: str = "NOTAG"
     c411_anonymous: bool = False
     
-    # qBittorrent Settings
+    # Torrent Client Settings
     qbittorrent_enabled: bool = True
-    qbittorrent_url: str = "http://localhost:8080"
+    qbittorrent_url: str = ""
     qbittorrent_username: str = "admin"
     qbittorrent_password: str = ""
     qbittorrent_category: str = "c411"
     qbittorrent_tags: str = "c411,upload"
     qbittorrent_path_mapping_from: str = "/data"
-    qbittorrent_path_mapping_to: str = "/mnt/Plex/Plex/films"
+    qbittorrent_path_mapping_to: str = ""
     qbittorrent_start_paused: bool = False
     
     # TMDB Settings
