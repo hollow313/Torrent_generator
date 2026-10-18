@@ -1,6 +1,7 @@
 import os
 import json
 import time
+import asyncio
 from typing import Dict, Any, List, Optional
 from fastapi import FastAPI, Request, HTTPException, BackgroundTasks
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
@@ -127,6 +128,11 @@ class TmdbSearchRequest(BaseModel):
     query: str
     year: Optional[str] = None
     media_type: str = "movie"
+
+class MassScanRequest(BaseModel):
+    folder_path: str
+    scan_mode: Optional[str] = "auto"  # auto, films, series_season, series_episode, mangas
+    limit: Optional[int] = 30
 
 def render_template(template_name: str, request: Request, context: Optional[Dict[str, Any]] = None):
     ctx = dict(context or {})
@@ -461,8 +467,179 @@ async def test_c411():
 async def search_tmdb(req: TmdbSearchRequest):
     cfg = get_config()
     client = TmdbClient(api_key=cfg.tmdb_api_key)
+    
+    # 1. Try direct URL or ID lookup first (e.g. TMDB link, IMDb link or ID)
+    direct_match = await client.lookup_by_url_or_id(req.query)
+    if direct_match:
+        return {"results": [direct_match], "direct_match": True}
+
+    # 2. Regular text search
     results = await client.search(query=req.query, year=req.year, media_type=req.media_type)
-    return {"results": results}
+    return {"results": results, "direct_match": False}
+
+@app.post("/api/mass-scan")
+async def mass_scan(req: MassScanRequest):
+    if not os.path.exists(req.folder_path):
+        raise HTTPException(status_code=404, detail="Dossier introuvable sur le serveur.")
+
+    cfg = get_config()
+    tracker = C411Tracker(api_key=cfg.c411_api_key, base_url=cfg.c411_base_url, passkey=cfg.c411_passkey)
+
+    candidates = []
+    video_exts = {".mkv", ".mp4", ".avi", ".ts", ".m2ts"}
+
+    mode = req.scan_mode or "auto"
+    folder_lower = req.folder_path.lower()
+    if mode == "auto":
+        if "film" in folder_lower:
+            mode = "films"
+        elif "manga" in folder_lower:
+            mode = "mangas"
+        elif "serie" in folder_lower:
+            mode = "series_season"
+        else:
+            mode = "films"
+
+    try:
+        entries = sorted(os.scandir(req.folder_path), key=lambda e: e.name.lower())
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur d'accès au dossier : {e}")
+
+    limit = req.limit or 30
+    for entry in entries:
+        if len(candidates) >= limit:
+            break
+
+        item_path = entry.path.replace("\\", "/")
+        item_name = entry.name
+
+        if item_name.startswith("."):
+            continue
+
+        if entry.is_file():
+            ext = os.path.splitext(item_name)[1].lower()
+            if ext in video_exts:
+                candidates.append({
+                    "path": item_path,
+                    "name": item_name,
+                    "is_dir": False,
+                    "size_bytes": entry.stat().st_size,
+                    "mode": "episode" if mode in ["series_episode", "mangas"] else "single"
+                })
+        elif entry.is_dir():
+            sz = 0
+            has_video = False
+            video_count = 0
+            try:
+                for root, _, files in os.walk(item_path):
+                    for f in files:
+                        if os.path.splitext(f)[1].lower() in video_exts:
+                            has_video = True
+                            video_count += 1
+                            sz += os.path.getsize(os.path.join(root, f))
+            except Exception:
+                pass
+
+            if has_video:
+                if mode == "series_episode":
+                    # Add individual episodes inside
+                    try:
+                        for f in sorted(os.listdir(item_path)):
+                            fp = os.path.join(item_path, f)
+                            if os.path.isfile(fp) and os.path.splitext(f)[1].lower() in video_exts:
+                                if len(candidates) >= limit:
+                                    break
+                                candidates.append({
+                                    "path": fp.replace("\\", "/"),
+                                    "name": f,
+                                    "is_dir": False,
+                                    "size_bytes": os.path.getsize(fp),
+                                    "mode": "episode"
+                                })
+                    except Exception:
+                        pass
+                else:
+                    folder_mode = "season_pack" if ("s0" in item_name.lower() or "saison" in item_name.lower() or "season" in item_name.lower()) else ("integrale" if video_count > 1 else "single")
+                    candidates.append({
+                        "path": item_path,
+                        "name": item_name,
+                        "is_dir": True,
+                        "size_bytes": sz,
+                        "mode": folder_mode
+                    })
+
+    # Query C411 for each candidate
+    results = []
+    for item in candidates:
+        import re
+        name = item["name"]
+        sz_mb = item["size_bytes"] / (1024 * 1024)
+        size_str = f"{sz_mb / 1024:.2f} Go" if sz_mb >= 1024 else f"{sz_mb:.2f} Mo"
+
+        res_match = re.search(r"\b(2160p|1080p|720p|576p|480p)\b", name, re.IGNORECASE)
+        resolution = res_match.group(1).lower() if res_match else "1080p"
+
+        src_match = re.search(r"\b(BluRay|BDRip|BRRip|WEB-DL|WEBRip|WEB|HDTV|DVDRip|REMUX)\b", name, re.IGNORECASE)
+        source = src_match.group(1) if src_match else "WEB"
+
+        tag_match = re.search(r"-([A-Za-z0-9_]+)(?:\.[a-zA-Z0-9]+)?$", name)
+        tag = tag_match.group(1) if tag_match else "NOTAG"
+
+        # Check duplicates
+        dupe_res = await tracker.check_duplicates(
+            title=name,
+            resolution=resolution,
+            source=source,
+            tag=tag
+        )
+
+        status = "green"
+        status_label = "Absent de C411"
+        details = "Aucun doublon trouvé."
+        match_item = None
+
+        if dupe_res.get("same_tag_duplicates"):
+            status = "red"
+            top = dupe_res["same_tag_duplicates"][0]
+            status_label = f"Doublon Strict Team (-{dupe_res.get('matched_tag', tag)})"
+            details = f"{top['title']} ({top['seeders']}S / {top['size']})"
+            match_item = top
+        elif dupe_res.get("same_quality_duplicates"):
+            status = "yellow"
+            top = dupe_res["same_quality_duplicates"][0]
+            status_label = "Même Format (Autre Team)"
+            details = f"{top['title']} ({top['seeders']}S / {top['size']})"
+            match_item = top
+        elif dupe_res.get("other_versions"):
+            status = "green"
+            top = dupe_res["other_versions"][0]
+            status_label = "Qualité Distincte (Autorisé)"
+            details = f"{top['title']} ({top['seeders']}S / {top['size']})"
+            match_item = top
+
+        results.append({
+            "path": item["path"],
+            "name": item["name"],
+            "is_dir": item["is_dir"],
+            "size_str": size_str,
+            "size_bytes": item["size_bytes"],
+            "resolution": resolution.upper(),
+            "source": source,
+            "tag": tag,
+            "mode": item["mode"],
+            "status": status,
+            "status_label": status_label,
+            "details": details,
+            "c411_match": match_item
+        })
+        await asyncio.sleep(0.04)
+
+    return {
+        "folder_path": req.folder_path,
+        "scan_mode": mode,
+        "total_scanned": len(results),
+        "results": results
+    }
 
 @app.get("/api/download")
 async def download_file(path: str):

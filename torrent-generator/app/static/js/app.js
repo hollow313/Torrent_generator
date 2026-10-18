@@ -8,6 +8,7 @@ let currentGeneratedData = null;
 document.addEventListener("DOMContentLoaded", () => {
     initTabs();
     initExplorer();
+    initScanner();
     initGenerator();
     initSettings();
     initHistory();
@@ -42,7 +43,7 @@ function initTabs() {
         });
     });
 
-    // Subtabs for NFO & BBCode
+    // Subtabs for NFO & BBCode & Preview
     document.querySelectorAll(".subtab-btn").forEach(btn => {
         btn.addEventListener("click", () => {
             document.querySelectorAll(".subtab-btn").forEach(b => b.classList.remove("active"));
@@ -50,9 +51,20 @@ function initTabs() {
             
             btn.classList.add("active");
             const subtabId = btn.getAttribute("data-subtab");
-            document.getElementById(subtabId).classList.add("active");
+            const targetContent = document.getElementById(subtabId);
+            if (targetContent) targetContent.classList.add("active");
+
+            if (subtabId === "sub-bbcode-preview") {
+                updateBbcodePreview();
+            }
         });
     });
+
+    // Refresh live preview button
+    const refreshPreviewBtn = document.getElementById("btn-refresh-preview");
+    if (refreshPreviewBtn) {
+        refreshPreviewBtn.addEventListener("click", updateBbcodePreview);
+    }
 
     // Copy editor content
     document.getElementById("btn-copy-active-editor").addEventListener("click", () => {
@@ -60,6 +72,9 @@ function initTabs() {
         if (activeSubtab) {
             navigator.clipboard.writeText(activeSubtab.value);
             showToast("Texte copié dans le presse-papiers !", "success");
+        } else if (document.getElementById("sub-bbcode-preview").classList.contains("active")) {
+            navigator.clipboard.writeText(document.getElementById("editor-bbcode").value);
+            showToast("BBCode copié dans le presse-papiers !", "success");
         }
     });
 }
@@ -77,6 +92,7 @@ function switchTab(tabId) {
     // Dynamic titles
     const titles = {
         explorer: ["Explorateur de Médias", "Parcourez vos disques du serveur et sélectionnez un média à uploader"],
+        scanner: ["Analyse Globale & Doublons C411", "Scannez un dossier complet de votre serveur pour vérifier les doublons et préparer vos uploads"],
         generator: ["Générateur & Vérification", "Vérifiez les règles C411, générez NFO et Torrent puis uploadez"],
         history: ["Historique", "Consultez et téléchargez vos torrents précédemment générés"],
         settings: ["Paramètres", "Configurez vos accès C411, client torrent et les chemins de disques"]
@@ -353,8 +369,8 @@ function recalculateTitle() {
     // Detect existing tokens from raw filename
     const seMatch = raw.match(/\b(S\d{1,2}E\d{1,4})\b/i);
     const sMatch = raw.match(/\b(S\d{1,2})\b/i);
-    const eMatch = raw.match(/\b(?:E|Ep|Episode[\s\.]*)(\d{1,4})\b/i);
-    const tMatch = raw.match(/\b(?:T|Tome|Vol|Volume[\s\.]*)(\d{1,3})\b/i);
+    const eMatch = raw.match(/\b(?:Episode|Ep|E)[\s\.]*(\d{1,4})\b/i);
+    const tMatch = raw.match(/\b(?:Tome|Volume|Vol|T)[\s\.]*(\d{1,3})\b/i);
     const tRangeMatch = raw.match(/\b(T\d{1,3}[\-\.]T\d{1,3})\b/i);
 
     if (mode === "episode") {
@@ -686,14 +702,23 @@ async function checkDuplicatesC411(releaseTitle) {
     }
 }
 
-// TMDB Search & Selection
+// TMDB Search & Selection (Supports Title, direct TMDB URL, or IMDb ID)
 async function searchTmdb() {
     const q = document.getElementById("tmdb-search-input").value.trim();
     if (!q) return;
 
+    const badge = document.getElementById("tmdb-status-badge");
     const container = document.getElementById("tmdb-results-container");
     const list = document.getElementById("tmdb-cards-list");
-    list.innerHTML = `<div class="text-muted"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Recherche TMDB...</div>`;
+
+    const isDirect = q.match(/themoviedb\.org\/(movie|tv)\/\d+/i) || q.match(/^tt\d{7,8}$/i) || q.match(/^\d+$/);
+    if (isDirect) {
+        if (badge) badge.textContent = "Résolution directe...";
+        list.innerHTML = `<div class="text-muted"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Récupération directe de la fiche TMDB / IMDb...</div>`;
+    } else {
+        if (badge) badge.textContent = "Recherche titre...";
+        list.innerHTML = `<div class="text-muted"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Recherche TMDB en cours...</div>`;
+    }
     container.style.display = "block";
 
     try {
@@ -705,10 +730,12 @@ async function searchTmdb() {
         const data = await res.json();
 
         if (!data.results || data.results.length === 0) {
-            list.innerHTML = `<div class="text-muted">Aucun résultat trouvé sur TMDB.</div>`;
+            list.innerHTML = `<div class="text-muted">Aucun résultat trouvé sur TMDB pour "${escapeHtml(q)}".</div>`;
+            if (badge) badge.textContent = "Aucun résultat";
             return;
         }
 
+        if (badge) badge.textContent = `${data.results.length} résultat(s)`;
         list.innerHTML = "";
         data.results.forEach(item => {
             const card = document.createElement("div");
@@ -726,6 +753,7 @@ async function searchTmdb() {
 
     } catch (e) {
         list.innerHTML = `<div class="text-danger">Erreur : ${e.message}</div>`;
+        if (badge) badge.textContent = "Erreur TMDB";
     }
 }
 
@@ -733,6 +761,9 @@ function applyTmdbMetadata(item) {
     document.getElementById("tmdb-id-val").value = item.id;
     document.getElementById("poster-url-val").value = item.poster_url || "";
     document.getElementById("tmdb-results-container").style.display = "none";
+
+    const badge = document.getElementById("tmdb-status-badge");
+    if (badge) badge.textContent = `Fiche : ${item.title} (${item.year || 'N/A'})`;
 
     // Regenerate BBCode description with Poster and French Synopsis
     if (currentAnalysis) {
@@ -768,7 +799,303 @@ function applyTmdbMetadata(item) {
         bb += `[i]Release partagée avec Torrent Generator C411[/i]\n[/center]`;
 
         document.getElementById("editor-bbcode").value = bb;
+        updateBbcodePreview();
         showToast(`Métadonnées appliquées : "${item.title}" (${item.year})`, "success");
+    }
+}
+
+// ==========================================
+// Analyse Globale / Mass Directory Scanner
+// ==========================================
+let scannerResults = [];
+let currentScannerFilter = "all";
+
+function initScanner() {
+    // Quick path chips
+    document.querySelectorAll(".btn-chip").forEach(chip => {
+        chip.addEventListener("click", () => {
+            const folder = chip.getAttribute("data-folder");
+            const mode = chip.getAttribute("data-mode");
+            if (folder) document.getElementById("scanner-folder-input").value = folder;
+            if (mode) document.getElementById("scanner-mode-select").value = mode;
+        });
+    });
+
+    // Start Scan Button
+    const btnScan = document.getElementById("btn-start-mass-scan");
+    if (btnScan) {
+        btnScan.addEventListener("click", runMassScan);
+    }
+
+    // Filter Buttons
+    document.querySelectorAll(".filter-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const filter = btn.getAttribute("data-filter");
+            applyScannerFilter(filter);
+        });
+    });
+
+    // KPI Cards as Filter Shortcuts
+    document.querySelectorAll(".filter-kpi-card").forEach(card => {
+        card.addEventListener("click", () => {
+            const filter = card.getAttribute("data-filter");
+            applyScannerFilter(filter);
+        });
+    });
+}
+
+async function runMassScan() {
+    const folderInput = document.getElementById("scanner-folder-input").value.trim();
+    const modeSelect = document.getElementById("scanner-mode-select").value;
+    const btnScan = document.getElementById("btn-start-mass-scan");
+
+    if (!folderInput) {
+        showToast("Veuillez indiquer un chemin de dossier.", "error");
+        return;
+    }
+
+    btnScan.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-2"></i> Analyse en cours...`;
+    btnScan.disabled = true;
+
+    try {
+        const res = await fetch("/api/mass-scan", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                folder_path: folderInput,
+                mode: modeSelect,
+                check_c411: true
+            })
+        });
+
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.detail || "Erreur lors du scan du dossier.");
+        }
+
+        const data = await res.json();
+        scannerResults = data.items || [];
+
+        // Update KPIs
+        const total = scannerResults.length;
+        const uploadable = scannerResults.filter(i => i.status_code === "green").length;
+        const warning = scannerResults.filter(i => i.status_code === "yellow").length;
+        const danger = scannerResults.filter(i => i.status_code === "red").length;
+
+        document.getElementById("kpi-total").textContent = total;
+        document.getElementById("kpi-uploadable").textContent = uploadable;
+        document.getElementById("kpi-warning").textContent = warning;
+        document.getElementById("kpi-danger").textContent = danger;
+
+        document.getElementById("scanner-kpis").style.display = "grid";
+        document.getElementById("scanner-results-card").style.display = "block";
+        document.getElementById("scanner-empty-state").style.display = "none";
+
+        const now = new Date();
+        document.getElementById("scanner-scan-time").textContent = `Dernier scan : ${now.toLocaleTimeString()}`;
+
+        currentScannerFilter = "all";
+        applyScannerFilter("all");
+
+        showToast(`Scan terminé : ${total} élément(s) analysé(s) !`, "success");
+
+    } catch (e) {
+        showToast(`Échec du scan : ${e.message}`, "error");
+    } finally {
+        btnScan.innerHTML = `<i class="fa-solid fa-magnifying-glass-chart mr-2"></i> Lancer l'Analyse Globale`;
+        btnScan.disabled = false;
+    }
+}
+
+function applyScannerFilter(filter) {
+    currentScannerFilter = filter;
+
+    document.querySelectorAll(".filter-btn").forEach(b => {
+        if (b.getAttribute("data-filter") === filter) {
+            b.classList.add("active");
+        } else {
+            b.classList.remove("active");
+        }
+    });
+
+    renderScannerTable();
+}
+
+function renderScannerTable() {
+    const tbody = document.getElementById("scanner-table-body");
+    tbody.innerHTML = "";
+
+    let filtered = scannerResults;
+    if (currentScannerFilter === "uploadable") {
+        filtered = scannerResults.filter(i => i.status_code === "green");
+    } else if (currentScannerFilter === "different_quality") {
+        filtered = scannerResults.filter(i => i.status_code === "yellow");
+    } else if (currentScannerFilter === "duplicate") {
+        filtered = scannerResults.filter(i => i.status_code === "red");
+    }
+
+    document.getElementById("scanner-filtered-count").textContent = filtered.length;
+
+    if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-muted">Aucun résultat pour ce filtre.</td></tr>`;
+        return;
+    }
+
+    filtered.forEach(item => {
+        const tr = document.createElement("tr");
+
+        const isDir = item.is_dir;
+        const icon = isDir ? "fa-folder text-warning" : getFileIcon(item.name);
+
+        // Mode badge
+        const modeLabels = {
+            single: "Film",
+            season_pack: "Saison Pack",
+            episode: "Épisode",
+            integrale: "Intégrale",
+            manga_tome: "Tome Manga",
+            manga_pack: "Pack Manga"
+        };
+        const modeLabel = modeLabels[item.suggested_mode] || item.suggested_mode || "Média";
+
+        // Status badge
+        let statusBadge = "";
+        if (item.status_code === "green") {
+            statusBadge = `
+                <div class="flex items-center gap-1 mb-1">
+                    <span class="badge badge-success"><i class="fa-solid fa-circle-check mr-1"></i> Prêt pour Upload</span>
+                </div>
+                <small class="text-muted block text-xs">Aucun doublon trouvé sur C411</small>
+            `;
+        } else if (item.status_code === "red") {
+            let dupDetails = "";
+            if (item.duplicates_info && item.duplicates_info.same_tag_duplicates && item.duplicates_info.same_tag_duplicates.length > 0) {
+                const d = item.duplicates_info.same_tag_duplicates[0];
+                dupDetails = `<small class="text-danger block text-xs truncate" style="max-width: 260px;" title="${escapeHtml(d.title)}">Existant: ${escapeHtml(d.title)} (${d.size})</small>`;
+            }
+            statusBadge = `
+                <div class="flex items-center gap-1 mb-1">
+                    <span class="badge badge-danger font-bold"><i class="fa-solid fa-ban mr-1"></i> Doublon Strict (-${escapeHtml(item.tag)})</span>
+                </div>
+                ${dupDetails}
+            `;
+        } else if (item.status_code === "yellow") {
+            let dupDetails = "";
+            if (item.duplicates_info && item.duplicates_info.same_quality_duplicates && item.duplicates_info.same_quality_duplicates.length > 0) {
+                const d = item.duplicates_info.same_quality_duplicates[0];
+                dupDetails = `<small class="text-warning block text-xs truncate" style="max-width: 260px;" title="${escapeHtml(d.title)}">Autre team: ${escapeHtml(d.title)}</small>`;
+            }
+            statusBadge = `
+                <div class="flex items-center gap-1 mb-1">
+                    <span class="badge badge-warning"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Autre Qualité / Team</span>
+                </div>
+                ${dupDetails}
+            `;
+        } else {
+            statusBadge = `<span class="badge badge-secondary">Non vérifié</span>`;
+        }
+
+        const safePath = escapeJsString(item.path);
+        const safeMode = item.suggested_mode || "single";
+
+        tr.innerHTML = `
+            <td>
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid ${icon}"></i>
+                    <div>
+                        <strong class="font-mono text-xs block text-primary" title="${escapeHtml(item.clean_title || item.name)}">${escapeHtml(item.clean_title || item.name)}</strong>
+                        <small class="text-muted block font-mono" style="font-size: 0.7rem;">${escapeHtml(item.name)}</small>
+                    </div>
+                </div>
+            </td>
+            <td class="font-mono text-xs font-semibold">${item.size}</td>
+            <td><span class="badge badge-info">${modeLabel}</span></td>
+            <td><span class="badge badge-primary font-mono">-${escapeHtml(item.tag)}</span></td>
+            <td>${statusBadge}</td>
+            <td style="text-align: right;">
+                <button class="btn btn-primary btn-xs" onclick="loadFromScanner('${safePath}', '${safeMode}');">
+                    <i class="fa-solid fa-bolt mr-1"></i> Traiter
+                </button>
+            </td>
+        `;
+
+        tbody.appendChild(tr);
+    });
+}
+
+function loadFromScanner(path, mode) {
+    switchTab("generator");
+    selectAndAnalyze(path, mode);
+    showToast("Média chargé dans le Générateur !", "info");
+}
+
+function escapeJsString(str) {
+    if (!str) return "";
+    return str.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+}
+
+// ==========================================
+// BBCode Live HTML Preview Generator
+// ==========================================
+function renderBbcodeToHtml(bbcode) {
+    if (!bbcode) return "<div class='text-muted text-center py-6'>Aucune description BBCode à afficher.</div>";
+
+    let html = escapeHtml(bbcode);
+
+    // [center]...[/center]
+    html = html.replace(/\[center\]([\s\S]*?)\[\/center\]/gi, '<div style="text-align: center;">$1</div>');
+
+    // [b], [i], [u], [s]
+    html = html.replace(/\[b\]([\s\S]*?)\[\/b\]/gi, '<strong>$1</strong>');
+    html = html.replace(/\[i\]([\s\S]*?)\[\/i\]/gi, '<em>$1</em>');
+    html = html.replace(/\[u\]([\s\S]*?)\[\/u\]/gi, '<u>$1</u>');
+    html = html.replace(/\[s\]([\s\S]*?)\[\/s\]/gi, '<s>$1</s>');
+
+    // [size=N]...[/size]
+    html = html.replace(/\[size=([1-7])\]([\s\S]*?)\[\/size\]/gi, (match, size, content) => {
+        const sizes = { "1": "0.75rem", "2": "0.85rem", "3": "1rem", "4": "1.2rem", "5": "1.45rem", "6": "1.8rem", "7": "2.2rem" };
+        const s = sizes[size] || "1rem";
+        return `<span style="font-size: ${s}; line-height: 1.3;">${content}</span>`;
+    });
+
+    // [color=HEX or NAME]...[/color]
+    html = html.replace(/\[color=([#a-zA-Z0-9]+)\]([\s\S]*?)\[\/color\]/gi, '<span style="color: $1;">$2</span>');
+
+    // [font=monospace]...[/font]
+    html = html.replace(/\[font=monospace\]([\s\S]*?)\[\/font\]/gi, '<span style="font-family: var(--font-mono); font-size: 0.82rem;">$1</span>');
+
+    // [img]URL[/img]
+    html = html.replace(/\[img\](https?:\/\/[^\s<]+)\[\/img\]/gi, '<img src="$1" style="max-width: 100%; max-height: 380px; border-radius: 8px; margin: 0.75rem auto; display: block; box-shadow: 0 4px 15px rgba(0,0,0,0.5);" alt="Poster">');
+
+    // [url=URL]text[/url] & [url]URL[/url]
+    html = html.replace(/\[url=(https?:\/\/[^\s<]+)\]([\s\S]*?)\[\/url\]/gi, '<a href="$1" target="_blank" rel="noopener noreferrer" style="color: var(--primary); text-decoration: underline;">$2</a>');
+    html = html.replace(/\[url\](https?:\/\/[^\s<]+)\[\/url\]/gi, '<a href="$1" target="_blank" rel="noopener noreferrer" style="color: var(--primary); text-decoration: underline;">$1</a>');
+
+    // [quote]...[/quote]
+    html = html.replace(/\[quote\]([\s\S]*?)\[\/quote\]/gi, '<blockquote class="bbcode-quote">$1</blockquote>');
+
+    // [spoiler=TITLE]...[/spoiler] or [spoiler]...[/spoiler]
+    html = html.replace(/\[spoiler=([^\]]+)\]([\s\S]*?)\[\/spoiler\]/gi, '<details class="bbcode-spoiler" open><summary><i class="fa-solid fa-chevron-right mr-1"></i> $1</summary><pre class="bbcode-pre">$2</pre></details>');
+    html = html.replace(/\[spoiler\]([\s\S]*?)\[\/spoiler\]/gi, '<details class="bbcode-spoiler" open><summary><i class="fa-solid fa-chevron-right mr-1"></i> Détails techniques</summary><pre class="bbcode-pre">$1</pre></details>');
+
+    // [hr]
+    html = html.replace(/\[hr\]/gi, '<hr class="bbcode-hr">');
+
+    // Split pre blocks to avoid double br
+    const parts = html.split(/(<pre[\s\S]*?<\/pre>)/gi);
+    html = parts.map(part => {
+        if (part.startsWith("<pre")) return part;
+        return part.replace(/\r?\n/g, "<br>");
+    }).join("");
+
+    return html;
+}
+
+function updateBbcodePreview() {
+    const raw = document.getElementById("editor-bbcode").value;
+    const previewBox = document.getElementById("bbcode-rendered-preview");
+    if (previewBox) {
+        previewBox.innerHTML = renderBbcodeToHtml(raw);
     }
 }
 

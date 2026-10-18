@@ -27,6 +27,10 @@
                     <i class="fa-solid fa-folder-open"></i>
                     <span>Explorateur</span>
                 </button>
+                <button class="nav-item" data-tab="scanner">
+                    <i class="fa-solid fa-satellite-dish"></i>
+                    <span>Analyse Globale</span>
+                </button>
                 <button class="nav-item" data-tab="generator">
                     <i class="fa-solid fa-wand-magic-sparkles"></i>
                     <span>Générateur</span>
@@ -110,6 +114,128 @@
                             </table>
                         </div>
                     </div>
+                </div>
+            </section>
+
+            <!-- Tab: Global / Mass Scanner -->
+            <section class="tab-pane" id="pane-scanner">
+                <div class="card mb-4">
+                    <div class="card-header flex justify-between items-center">
+                        <div class="flex items-center gap-2">
+                            <i class="fa-solid fa-satellite-dish text-primary"></i>
+                            <h3 class="font-bold">Analyse Globale & Détection de Doublons C411</h3>
+                        </div>
+                        <span class="badge badge-info text-xs">Scan par lots de dossier média</span>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-sm text-muted mb-4">
+                            Scannez un dossier complet de votre serveur (films, séries par saison ou épisode, mangas) pour analyser automatiquement chaque média et vérifier sa disponibilité sur C411 (qualité, team tag, taille).
+                        </p>
+                        <div class="grid-3-col gap-3 mb-3">
+                            <div class="form-group">
+                                <label class="form-label">Dossier à analyser</label>
+                                <input type="text" id="scanner-folder-input" class="input font-mono" value="/data/films" placeholder="/data/films">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Mode d'analyse</label>
+                                <select id="scanner-mode-select" class="input">
+                                    <option value="auto">🔍 Auto-détection (Selon dossier)</option>
+                                    <option value="films">🎬 Films (1 fichier = 1 release)</option>
+                                    <option value="series_seasons">📦 Séries - Saisons complètes (1 dossier = 1 pack)</option>
+                                    <option value="series_episodes">🎞️ Séries - Épisodes individuels (1 fichier = 1 torrent)</option>
+                                    <option value="mangas">📚 Mangas (Vidéos ou Ebooks / Scans)</option>
+                                </select>
+                            </div>
+                            <div class="form-group flex items-end">
+                                <button class="btn btn-primary w-full" id="btn-start-mass-scan" style="height: 42px;">
+                                    <i class="fa-solid fa-magnifying-glass-chart mr-2"></i> Lancer l'Analyse Globale
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Quick directory chips -->
+                        <div class="flex items-center gap-2 mb-2 flex-wrap">
+                            <span class="text-xs text-muted">Raccourcis serveur :</span>
+                            <button type="button" class="btn btn-outline btn-xs btn-chip" data-folder="/data/films" data-mode="films">📁 /data/films</button>
+                            <button type="button" class="btn btn-outline btn-xs btn-chip" data-folder="/data/series" data-mode="series_seasons">📦 /data/series (Saisons)</button>
+                            <button type="button" class="btn btn-outline btn-xs btn-chip" data-folder="/data/series" data-mode="series_episodes">🎞️ /data/series (Épisodes)</button>
+                            <button type="button" class="btn btn-outline btn-xs btn-chip" data-folder="/data/mangas" data-mode="mangas">📖 /data/mangas</button>
+                            <button type="button" class="btn btn-outline btn-xs btn-chip" data-folder="/data/spectacles" data-mode="films">🎭 /data/spectacles</button>
+                            <button type="button" class="btn btn-outline btn-xs btn-chip" data-folder="/data/emissions" data-mode="films">📺 /data/emissions</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Scanner KPI summary cards (Total, Uploadable, Different Quality, Duplicates) -->
+                <div class="grid-4-col gap-4 mb-4" id="scanner-kpis" style="display: none;">
+                    <div class="card p-3 filter-kpi-card" data-filter="all" style="cursor: pointer;">
+                        <span class="text-xs text-muted block mb-1">Total Analysés</span>
+                        <div class="flex justify-between items-center">
+                            <span class="text-2xl font-bold" id="kpi-total">0</span>
+                            <i class="fa-solid fa-layer-group text-primary text-xl"></i>
+                        </div>
+                    </div>
+                    <div class="card p-3 filter-kpi-card border-success" data-filter="uploadable" style="cursor: pointer; background: rgba(16, 185, 129, 0.08);">
+                        <span class="text-xs text-success block mb-1 font-semibold">Prêts pour Upload</span>
+                        <div class="flex justify-between items-center">
+                            <span class="text-2xl font-bold text-success" id="kpi-uploadable">0</span>
+                            <i class="fa-solid fa-circle-check text-success text-xl"></i>
+                        </div>
+                    </div>
+                    <div class="card p-3 filter-kpi-card border-warning" data-filter="different_quality" style="cursor: pointer; background: rgba(245, 158, 11, 0.08);">
+                        <span class="text-xs text-warning block mb-1 font-semibold">Autre Qualité / Team</span>
+                        <div class="flex justify-between items-center">
+                            <span class="text-2xl font-bold text-warning" id="kpi-warning">0</span>
+                            <i class="fa-solid fa-triangle-exclamation text-warning text-xl"></i>
+                        </div>
+                    </div>
+                    <div class="card p-3 filter-kpi-card border-danger" data-filter="duplicate" style="cursor: pointer; background: rgba(239, 68, 68, 0.08);">
+                        <span class="text-xs text-danger block mb-1 font-semibold">Doublon Strict (Même Team)</span>
+                        <div class="flex justify-between items-center">
+                            <span class="text-2xl font-bold text-danger" id="kpi-danger">0</span>
+                            <i class="fa-solid fa-ban text-danger text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Scanner Table Card -->
+                <div class="card" id="scanner-results-card" style="display: none;">
+                    <div class="card-header flex justify-between items-center">
+                        <div class="flex items-center gap-3">
+                            <h4><i class="fa-solid fa-table-list text-primary mr-2"></i> Résultats de l'analyse (<span id="scanner-filtered-count">0</span>)</h4>
+                            <div class="flex gap-1">
+                                <button type="button" class="btn btn-xs btn-outline filter-btn active" data-filter="all">Tous</button>
+                                <button type="button" class="btn btn-xs btn-outline filter-btn" data-filter="uploadable">🟢 Prêts</button>
+                                <button type="button" class="btn btn-xs btn-outline filter-btn" data-filter="different_quality">🟡 Qualité diff.</button>
+                                <button type="button" class="btn btn-xs btn-outline filter-btn" data-filter="duplicate">🔴 Doublons</button>
+                            </div>
+                        </div>
+                        <span class="text-xs text-muted" id="scanner-scan-time"></span>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-container" style="max-height: 520px; overflow-y: auto;">
+                            <table class="table" id="scanner-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 32%;">Média / Release</th>
+                                        <th style="width: 10%;">Taille</th>
+                                        <th style="width: 12%;">Type / Mode</th>
+                                        <th style="width: 10%;">Tag</th>
+                                        <th style="width: 24%;">Statut C411</th>
+                                        <th style="width: 12%; text-align: right;">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="scanner-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Empty State before scan -->
+                <div id="scanner-empty-state" class="card text-center py-12">
+                    <div class="empty-icon"><i class="fa-solid fa-magnifying-glass-chart"></i></div>
+                    <h3>Prêt pour l'Analyse Globale</h3>
+                    <p class="text-muted mb-4">Choisissez un dossier (ex: <code>/data/films</code>) et cliquez sur "Lancer l'Analyse Globale".</p>
                 </div>
             </section>
 
@@ -270,13 +396,17 @@
 
                                 <!-- TMDB Lookup Row -->
                                 <div class="form-group mb-3">
-                                    <label class="form-label">Recherche Métadonnées TMDB (Synopsis & Affiche)</label>
+                                    <label class="form-label flex justify-between">
+                                        <span>Recherche Métadonnées TMDB (Synopsis & Affiche)</span>
+                                        <span class="text-xs text-muted" id="tmdb-status-badge">Titre, ID ou URL</span>
+                                    </label>
                                     <div class="flex gap-2">
-                                        <input type="text" id="tmdb-search-input" class="input" placeholder="Titre pour TMDB...">
+                                        <input type="text" id="tmdb-search-input" class="input" placeholder="Titre, ID ou lien direct TMDB / IMDb (ex: tt1234567 ou lien themoviedb.org)...">
                                         <button class="btn btn-secondary" id="btn-search-tmdb">
                                             <i class="fa-solid fa-magnifying-glass"></i> TMDB
                                         </button>
                                     </div>
+                                    <small class="form-hint">Vous pouvez coller directement l'URL d'un film/série TMDB ou son ID IMDb (ex: tt1234567).</small>
                                     <input type="hidden" id="tmdb-id-val">
                                     <input type="hidden" id="imdb-id-val">
                                     <input type="hidden" id="poster-url-val">
@@ -341,6 +471,9 @@
                                 <button class="subtab-btn" data-subtab="sub-bbcode">
                                     <i class="fa-solid fa-code mr-1"></i> Description BBCode (C411)
                                 </button>
+                                <button class="subtab-btn" data-subtab="sub-bbcode-preview" id="btn-tab-bbcode-preview">
+                                    <i class="fa-solid fa-eye mr-1"></i> Aperçu Rendu Web (C411)
+                                </button>
                             </div>
                             <div class="flex gap-2 py-2">
                                 <button class="btn btn-xs btn-outline" id="btn-copy-active-editor">
@@ -356,6 +489,14 @@
                             <!-- BBCode Subtab -->
                             <div class="subtab-content" id="sub-bbcode">
                                 <textarea id="editor-bbcode" class="code-editor" rows="16" spellcheck="false"></textarea>
+                            </div>
+                            <!-- BBCode Preview Subtab -->
+                            <div class="subtab-content" id="sub-bbcode-preview">
+                                <div class="flex justify-between items-center mb-2 pb-2" style="border-bottom: 1px solid var(--border-color);">
+                                    <span class="text-xs text-muted"><i class="fa-solid fa-circle-info mr-1"></i> Prévisualisation de votre future présentation telle qu'elle apparaîtra sur C411</span>
+                                    <button class="btn btn-outline btn-xs" id="btn-refresh-preview"><i class="fa-solid fa-arrows-rotate mr-1"></i> Actualiser l'aperçu</button>
+                                </div>
+                                <div id="bbcode-rendered-preview" class="bbcode-preview-box"></div>
                             </div>
                         </div>
                     </div>

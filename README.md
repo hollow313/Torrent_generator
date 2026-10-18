@@ -36,7 +36,20 @@ Application web conteneurisée et automatisée conçue pour préparer, générer
     - 🔴 **Doublon strict détecté** : avertissement immédiat avec le nombre de seeders actuels pour éviter un refus par la modération.
     - 🟡 **Version différente autorisée** : confirme que la qualité (ex: 2160p UHD ou Remux) apporte une version distincte légitime selon les règles C411.
     - 🟢 **Feu vert** : aucun doublon existant.
-- 🎬 **Intégration TMDB** : Récupère automatiquement l'affiche officielle (poster), le synopsis en français et les identifiants TMDB/IMDb.
+- 📊 **Analyse Globale & Scan par lots (Nouvel onglet)** :
+  - Scannez un dossier média complet de votre serveur (`/data/films`, `/data/series`, `/data/mangas`...) en un clic.
+  - Détection automatique du type de release (Film unique, Saison complète, Épisode seul, Manga tome ou pack).
+  - Interrogation en masse de l'API C411 pour classer vos fichiers en temps réel :
+    - 🟢 **Prêt pour Upload** : aucun doublon trouvé sur C411.
+    - 🟡 **Autre Qualité / Team** : autre version présente (ex: 1080p alors que le 2160p existe).
+    - 🔴 **Doublon Strict** : même team ou même release déjà en ligne.
+  - Bouton **⚡ Traiter** pour charger instantanément n'importe quel média dans le Générateur sans repasser par l'explorateur.
+- 👁️ **Aperçu Rendu Web en direct (C411 BBCode Preview)** :
+  - Un sous-onglet dédié permet de visualiser fidèlement le rendu HTML exact de votre présentation BBCode (affiche grand format, synopsis en citation, mise en page centrée, spoilers techniques avec NFO).
+- 🎬 **Recherche Métadonnées TMDB / IMDb Avancée** :
+  - Recherche intelligente par titre ou **par URL directe** (ex: `https://www.themoviedb.org/movie/550`) ou **ID IMDb** (`tt0137523`).
+- 🚫 **Suppression stricte des doubles points (`..`)** :
+  - Normalisation automatique du titre pour éliminer tout double point consécutif (`..` -> `.`), cause fréquente de refus par la modération C411.
 - 🚀 **Upload Direct C411** : Envoi automatisé vers l'API UNIT3D (`/api/torrents/upload`) ou assistance au formulaire web.
 - 📥 **Injection Client Torrent avec Mappage de Chemin** :
   - Envoie le torrent généré à l'API de votre client de téléchargement.

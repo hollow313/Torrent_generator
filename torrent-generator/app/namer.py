@@ -39,10 +39,8 @@ class ReleaseNamer:
         Attempts to extract an existing release group/author tag from a filename.
         Returns: (tag, filename_without_tag)
         """
-        # Strip extension first
-        name_no_ext = filename
-        if "." in filename:
-            name_no_ext = ".".join(filename.split(".")[:-1])
+        # Strip known media/book file extensions first (case-insensitive)
+        name_no_ext = re.sub(r"\.(mkv|mp4|avi|mov|m4v|ts|m2ts|vob|flv|webm|cbz|cbr|epub|pdf|iso|rar|zip)$", "", filename, flags=re.IGNORECASE)
 
         # Match -TEAM at the end
         match = re.search(r"-([A-Za-z0-9]+)$", name_no_ext)
@@ -154,8 +152,8 @@ class ReleaseNamer:
         # Detect Season / Episode / Tome tokens (e.g. S01E05, S01, E1050, T01, T01-T20)
         se_match = re.search(r"\b(S\d{1,2}E\d{1,4})\b", raw_name, re.IGNORECASE)
         s_match = re.search(r"\b(S\d{1,2})\b", raw_name, re.IGNORECASE)
-        e_match = re.search(r"\b(?:E|Ep|Episode[\s\.]*)(\d{1,4})\b", raw_name, re.IGNORECASE)
-        t_match = re.search(r"\b(?:T|Tome|Vol|Volume[\s\.]*)(\d{1,3})\b", raw_name, re.IGNORECASE)
+        e_match = re.search(r"\b(?:Episode|Ep|E)[\s\.]*(\d{1,4})\b", raw_name, re.IGNORECASE)
+        t_match = re.search(r"\b(?:Tome|Volume|Vol|T)[\s\.]*(\d{1,3})\b", raw_name, re.IGNORECASE)
         t_range_match = re.search(r"\b(T\d{1,3}[\-\.]T\d{1,3})\b", raw_name, re.IGNORECASE)
 
         if not se_match and media_info.get("embedded_title"):
@@ -236,7 +234,21 @@ class ReleaseNamer:
             if video_codec:
                 parts.append(video_codec)
 
-        full_title = ".".join(parts) + f"-{chosen_tag}"
+        # Clean parts list: strip leading/trailing dots from each component
+        cleaned_parts = []
+        for p in parts:
+            if p:
+                cleaned_p = re.sub(r"^\.+|\.+$", "", str(p).strip())
+                if cleaned_p:
+                    cleaned_parts.append(cleaned_p)
+
+        full_title = ".".join(cleaned_parts) + f"-{chosen_tag}"
+        # Strictly collapse any consecutive dots anywhere in full_title
+        full_title = re.sub(r"\.+", ".", full_title)
+        # Ensure no dot precedes the team dash
+        full_title = re.sub(r"\.-", "-", full_title)
+        # Ensure no leading/trailing dot
+        full_title = full_title.strip(".")
 
         return {
             "title": full_title,

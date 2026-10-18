@@ -95,3 +95,62 @@ class TmdbClient:
         except Exception as e:
             print(f"[TMDB] Get details error: {e}")
             return None
+
+    async def find_by_imdb(self, imdb_id: str) -> Optional[Dict[str, Any]]:
+        """Looks up a title on TMDB using an IMDb ID (e.g. tt1234567)."""
+        if not self.api_key or not imdb_id:
+            return None
+        clean_imdb = imdb_id.strip()
+        url = f"{self.base_url}/find/{clean_imdb}"
+        params = {
+            "api_key": self.api_key,
+            "external_source": "imdb_id",
+            "language": "fr-FR"
+        }
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.get(url, params=params)
+                if resp.status_code != 200:
+                    return None
+                data = resp.json()
+                movie_res = data.get("movie_results", [])
+                tv_res = data.get("tv_results", [])
+                if movie_res:
+                    return await self.get_details(movie_res[0]["id"], "movie")
+                elif tv_res:
+                    return await self.get_details(tv_res[0]["id"], "tv")
+                return None
+        except Exception as e:
+            print(f"[TMDB] find_by_imdb error: {e}")
+            return None
+
+    async def lookup_by_url_or_id(self, input_str: str) -> Optional[Dict[str, Any]]:
+        """
+        Parses a TMDB URL, IMDb URL, or direct ID (tmdb or imdb) and returns full movie/tv details.
+        """
+        import re
+        s = input_str.strip()
+        if not s:
+            return None
+
+        # 1. Match TMDB URL (e.g. https://www.themoviedb.org/movie/550 or /tv/1399)
+        tmdb_url_match = re.search(r"themoviedb\.org/(movie|tv)/(\d+)", s)
+        if tmdb_url_match:
+            m_type = tmdb_url_match.group(1)
+            t_id = int(tmdb_url_match.group(2))
+            return await self.get_details(t_id, m_type)
+
+        # 2. Match IMDb URL or ID (e.g. https://www.imdb.com/title/tt0137523/ or tt0137523)
+        imdb_match = re.search(r"(tt\d{7,8})", s)
+        if imdb_match:
+            return await self.find_by_imdb(imdb_match.group(1))
+
+        # 3. Match pure integer ID (treat as TMDB ID)
+        if s.isdigit():
+            t_id = int(s)
+            details = await self.get_details(t_id, "movie")
+            if not details:
+                details = await self.get_details(t_id, "tv")
+            return details
+
+        return None

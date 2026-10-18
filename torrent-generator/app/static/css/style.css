@@ -661,3 +661,129 @@ body {
 .text-xs { font-size: 0.75rem; }
 .font-bold { font-weight: 700; }
 .font-semibold { font-weight: 600; }
+.w-full { width: 100%; }
+.block { display: block; }
+.text-2xl { font-size: 1.5rem; line-height: 2rem; }
+.text-xl { font-size: 1.25rem; }
+
+/* Grid 3 & 4 Columns */
+.grid-3-col {
+    display: grid;
+    grid-template-columns: 2fr 1.5fr 1.2fr;
+}
+
+@media (max-width: 1024px) {
+    .grid-3-col {
+        grid-template-columns: 1fr;
+    }
+}
+
+.grid-4-col {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+}
+
+@media (max-width: 1024px) {
+    .grid-4-col {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 640px) {
+    .grid-4-col {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Quick Action Chips */
+.btn-chip {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    background: rgba(15, 23, 42, 0.6);
+}
+
+.btn-chip:hover {
+    background: var(--primary-light);
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.filter-kpi-card {
+    transition: all 0.2s ease;
+}
+
+.filter-kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+/* BBCode Live HTML Preview Box */
+.bbcode-preview-box {
+    background-color: #0b111e;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.5rem;
+    min-height: 250px;
+    max-height: 480px;
+    overflow-y: auto;
+    font-family: var(--font-sans);
+    line-height: 1.6;
+    color: #e2e8f0;
+}
+
+.bbcode-quote {
+    background: rgba(15, 23, 42, 0.75);
+    border-left: 4px solid var(--primary);
+    border-radius: 0 6px 6px 0;
+    padding: 0.75rem 1rem;
+    margin: 0.75rem auto;
+    max-width: 85%;
+    font-style: italic;
+    color: #cbd5e1;
+    text-align: left;
+}
+
+.bbcode-spoiler {
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    margin: 1rem auto;
+    max-width: 90%;
+    text-align: left;
+    overflow: hidden;
+}
+
+.bbcode-spoiler summary {
+    padding: 0.6rem 1rem;
+    background: rgba(30, 41, 59, 0.6);
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.bbcode-spoiler summary:hover {
+    color: var(--primary);
+}
+
+.bbcode-pre {
+    padding: 1rem;
+    background: #070b13;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 320px;
+    overflow-y: auto;
+    color: #a5b4fc;
+}
+
+.bbcode-hr {
+    border: none;
+    border-top: 1px solid var(--border-color);
+    margin: 1.25rem auto;
+    max-width: 90%;
+}
+
