@@ -36,4 +36,5 @@ jobs:
           push: true
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/torrent-generator:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/torrent_generator:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/mon-image:latest

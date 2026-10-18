@@ -38,16 +38,29 @@ class QBittorrentClient:
 
     async def _get_authenticated_client(self) -> httpx.AsyncClient:
         client = httpx.AsyncClient(timeout=15.0, verify=False)
-        login_url = f"{self.base_url}/api/v2/auth/login"
-        data = {
-            "username": self.username,
-            "password": self.password
-        }
-        resp = await client.post(login_url, data=data)
-        if resp.status_code != 200 or "Fails" in resp.text:
+        try:
+            # 1. Vérifier si l'accès est déjà autorisé sans authentification (cas du réseau local / bypass auth qBittorrent)
+            test_resp = await client.get(f"{self.base_url}/api/v2/app/version")
+            if test_resp.status_code == 200:
+                # Accès direct sans authentification autorisé
+                return client
+
+            # 2. Si une authentification est requise (HTTP 403 Forbidden ou redirection)
+            login_url = f"{self.base_url}/api/v2/auth/login"
+            data = {
+                "username": self.username or "",
+                "password": self.password or ""
+            }
+            resp = await client.post(login_url, data=data)
+            if resp.status_code == 200 and "Fails" not in resp.text:
+                return client
+
             await client.aclose()
-            raise PermissionError(f"Échec d'authentification qBittorrent (HTTP {resp.status_code}): {resp.text}")
-        return client
+            error_msg = resp.text.strip() if resp.text else f"Code HTTP {resp.status_code}"
+            raise PermissionError(f"qBittorrent requiert une authentification valide ({error_msg}).")
+        except Exception as e:
+            await client.aclose()
+            raise e
 
     async def test_connection(self) -> Dict[str, Any]:
         """Tests connection and credentials against qBittorrent Web API."""
