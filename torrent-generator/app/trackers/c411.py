@@ -225,7 +225,8 @@ class C411Tracker(BaseTracker):
                 "total_found": 0
             }
 
-        exact_dupes = []
+        same_tag_dupes = []
+        same_quality_dupes = []
         other_versions = []
 
         res_lower = resolution.lower() if resolution else ""
@@ -234,34 +235,56 @@ class C411Tracker(BaseTracker):
 
         for item in results:
             item_title_lower = item["title"].lower()
-            tag_match = tag_lower and tag_lower != "notag" and f"-{tag_lower}" in item_title_lower
+            tag_match = bool(tag_lower and tag_lower != "notag" and f"-{tag_lower}" in item_title_lower)
             res_match = bool(res_lower and res_lower in item_title_lower)
             src_match = bool(src_lower and src_lower in item_title_lower)
 
-            if (res_match and src_match) or tag_match:
-                exact_dupes.append(item)
+            if tag_match:
+                same_tag_dupes.append(item)
+            elif res_match and src_match:
+                same_quality_dupes.append(item)
             else:
                 other_versions.append(item)
 
-        if exact_dupes:
+        if same_tag_dupes:
+            seeders_max = max(d["seeders"] for d in same_tag_dupes)
             return {
                 "can_upload": False,
                 "level": "danger",
-                "badge": "DOUBLON STRICT DÉTECTÉ",
-                "status_text": f"⚠️ {len(exact_dupes)} release(s) avec la même qualité/source ou même team existent déjà sur C411. Risque élevé de refus par la Team Pending.",
-                "exact_duplicates": exact_dupes,
+                "badge": f"⛔ DOUBLON STRICT TEAM (-{tag_lower.upper()})",
+                "status_text": f"🚨 DOUBLON DE VOTRE TEAM : {len(same_tag_dupes)} release(s) de la team -{tag_lower.upper()} existe(nt) déjà sur C411 ({seeders_max} seeders). Inutile d'uploader, le torrent identique est déjà en ligne !",
+                "same_tag_duplicates": same_tag_dupes,
+                "same_quality_duplicates": same_quality_dupes,
+                "exact_duplicates": same_tag_dupes + same_quality_dupes,
                 "other_versions": other_versions,
-                "total_found": len(results)
+                "total_found": len(results),
+                "matched_tag": tag_lower.upper()
+            }
+        elif same_quality_dupes:
+            return {
+                "can_upload": False,
+                "level": "warning",
+                "badge": "⚠️ MÊME FORMAT (AUTRE TEAM)",
+                "status_text": f"⚠️ {len(same_quality_dupes)} release(s) existent déjà dans la même résolution/source par d'autres teams. Selon les règles C411, un doublon de qualité n'est permis que si votre release apporte une plus-value avérée (ex: Remux vs Rip, TrueHD/Atmos, DV).",
+                "same_tag_duplicates": [],
+                "same_quality_duplicates": same_quality_dupes,
+                "exact_duplicates": same_quality_dupes,
+                "other_versions": other_versions,
+                "total_found": len(results),
+                "matched_tag": ""
             }
         else:
             return {
                 "can_upload": True,
-                "level": "warning",
-                "badge": "VERSION DISTINCTE AUTORISÉE",
-                "status_text": f"ℹ️ {len(other_versions)} version(s) trouvée(s) sur C411 mais dans une qualité ou source différente. Votre upload apporte une version distincte et est autorisé !",
+                "level": "success",
+                "badge": "✅ AUCUN DOUBLON (AUTORISÉ)",
+                "status_text": f"✅ Aucun doublon strict trouvé sur C411 ({len(other_versions)} version(s) dans d'autres qualités existante(s)). Vous pouvez uploader en toute confiance !",
+                "same_tag_duplicates": [],
+                "same_quality_duplicates": [],
                 "exact_duplicates": [],
                 "other_versions": other_versions,
-                "total_found": len(results)
+                "total_found": len(results),
+                "matched_tag": ""
             }
 
     async def upload(

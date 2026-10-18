@@ -166,15 +166,22 @@
                             <div class="card-body">
                                 <div class="form-group mb-3">
                                     <label class="form-label flex justify-between">
-                                        <span>Mode de Publication (Séries & Mangas)</span>
+                                        <span>Mode de Publication (Séries, Animes & Mangas)</span>
                                         <span class="badge badge-info" id="badge-pack-mode">FILM / UNIQUE</span>
                                     </label>
                                     <select id="select-release-mode" class="input">
-                                        <option value="single">🎬 Film / Média Unique</option>
-                                        <option value="season_pack">📺 Saison Complète (Pack - 1 torrent)</option>
-                                        <option value="episode">🎞️ Épisode Individuel</option>
-                                        <option value="integrale">📦 Intégrale Série (Toutes saisons)</option>
-                                        <option value="manga_pack">📚 Manga / Pack Tomes (T01 à TXX)</option>
+                                        <optgroup label="Films & Vidéos Uniques">
+                                            <option value="single">🎬 Film / Média Unique</option>
+                                        </optgroup>
+                                        <optgroup label="Séries TV & Animes (Vidéos)">
+                                            <option value="episode">🎞️ Épisode Individuel (ex: S01E05 ou E05)</option>
+                                            <option value="season_pack">📦 Saison Complète / Arc (ex: S01)</option>
+                                            <option value="integrale">🏆 Intégrale Série (Toutes saisons)</option>
+                                        </optgroup>
+                                        <optgroup label="Mangas & BDs (Ebooks / Scans)">
+                                            <option value="manga_tome">📖 Manga - Tome Individuel (ex: T05)</option>
+                                            <option value="manga_pack">📚 Manga - Pack Tomes / Intégrale (ex: T01-T20)</option>
+                                        </optgroup>
                                     </select>
                                 </div>
 

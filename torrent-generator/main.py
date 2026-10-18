@@ -230,10 +230,51 @@ async def analyze_file(req: AnalyzeRequest):
 
     # 1. MediaInfo analysis
     media_info = MediaAnalyzer.analyze(req.path)
-    
+    lower_path = req.path.lower()
+    is_dir = os.path.isdir(req.path)
+
+    # Detect video vs book
+    is_video = any(lower_path.endswith(ext) for ext in [".mkv", ".mp4", ".avi", ".ts", ".m2ts"]) or bool(media_info.get("video_codec"))
+    is_book = any(lower_path.endswith(ext) for ext in [".cbz", ".cbr", ".pdf", ".epub"]) or (media_info.get("container") in ["EPUB", "PDF", "CBZ", "CBR"])
+
+    # Determine recommended category & release mode
+    suggested_category_id = 2000  # Default: Films
+    suggested_mode = "single"
+
+    if "/mangas/" in lower_path or "manga" in lower_path:
+        if is_book:
+            suggested_category_id = 7030  # BDs & Comics & Manga (Ebook / Scans)
+            suggested_mode = "manga_pack" if is_dir else "manga_tome"
+        else:
+            suggested_category_id = 5070  # Animation Série (Anime)
+            suggested_mode = "season_pack" if is_dir else "episode"
+    elif "/series/" in lower_path or any(k in lower_path for k in ["s01", "s02", "s03", "saison", "season", "serie", "tv"]):
+        suggested_category_id = 5000  # Séries TV
+        suggested_mode = "season_pack" if is_dir else "episode"
+    elif "/books/" in lower_path or is_book:
+        suggested_category_id = 7020  # Livres
+        suggested_mode = "single"
+    elif "/emissions/" in lower_path:
+        suggested_category_id = 5080  # Emission TV
+        suggested_mode = "single"
+    elif "/spectacles/" in lower_path:
+        suggested_category_id = 2080  # Films Spectacle
+        suggested_mode = "single"
+    elif any(lower_path.endswith(ext) for ext in [".flac", ".mp3", ".wav", ".aac"]):
+        suggested_category_id = 3010  # Musique
+        suggested_mode = "single"
+    elif any(lower_path.endswith(ext) for ext in [".exe", ".iso", ".dmg"]):
+        suggested_category_id = 4000  # Applications
+        suggested_mode = "single"
+    else:
+        suggested_category_id = 2000
+        suggested_mode = "single"
+
+    effective_mode = req.release_mode if (req.release_mode and req.release_mode != "auto") else suggested_mode
+
     # 2. Release name formatting according to C411 standards
     raw_name = os.path.basename(req.path)
-    namer_res = ReleaseNamer.format_c411_title(raw_name, media_info, release_mode=req.release_mode or "single")
+    namer_res = ReleaseNamer.format_c411_title(raw_name, media_info, release_mode=effective_mode)
 
     # 3. Piece size calculation
     total_bytes = media_info.get("file_size", 0)
@@ -256,23 +297,12 @@ async def analyze_file(req: AnalyzeRequest):
         nfo_text=default_nfo
     )
 
-    # Determine recommended category ID
-    suggested_category_id = 2000  # Default: Films
-    lower_path = req.path.lower()
-    if any(k in lower_path for k in ["s01", "s02", "s03", "saison", "season", "serie", "tv"]):
-        suggested_category_id = 5000  # Séries TV
-    elif any(lower_path.endswith(ext) for ext in [".flac", ".mp3", ".wav", ".aac"]):
-        suggested_category_id = 3010  # Musique
-    elif any(lower_path.endswith(ext) for ext in [".epub", ".pdf", ".cbz", ".cbr"]):
-        suggested_category_id = 7020  # Livres
-    elif any(lower_path.endswith(ext) for ext in [".exe", ".iso", ".dmg"]):
-        suggested_category_id = 4000  # Applications
-
     return {
         "media_info": media_info,
         "namer": namer_res,
         "suggested_piece_size": suggested_piece_size,
         "suggested_category_id": suggested_category_id,
+        "suggested_release_mode": suggested_mode,
         "nfo": default_nfo,
         "bbcode": default_bbcode
     }

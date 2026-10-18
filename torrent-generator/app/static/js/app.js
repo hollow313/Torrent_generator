@@ -273,31 +273,29 @@ async function selectAndAnalyze(filePath) {
             subItemsList.innerHTML = "";
             media.sub_items.forEach(si => {
                 const tr = document.createElement("tr");
+                const isItemBook = si.name.match(/\.(epub|pdf|cbz|cbr)$/i);
+                const actionLabel = isItemBook ? "Tome seul" : "Épisode seul";
+                const modeToUse = isItemBook ? "manga_tome" : "episode";
                 tr.innerHTML = `
-                    <td class="font-mono text-xs"><i class="fa-solid fa-file-video text-primary mr-1"></i> ${escapeHtml(si.name)}</td>
+                    <td class="font-mono text-xs"><i class="fa-solid ${isItemBook ? 'fa-book text-info' : 'fa-file-video text-primary'} mr-1"></i> ${escapeHtml(si.name)}</td>
                     <td class="text-xs">${si.size}</td>
                     <td style="text-align: right;">
-                        <button class="btn btn-outline btn-xs" onclick="selectAndAnalyze('${si.path}', 'episode');">
-                            <i class="fa-solid fa-play mr-1"></i> Épisode seul
+                        <button class="btn btn-outline btn-xs" onclick="selectAndAnalyze('${si.path}', '${modeToUse}');">
+                            <i class="fa-solid fa-play mr-1"></i> ${actionLabel}
                         </button>
                     </td>
                 `;
                 subItemsList.appendChild(tr);
             });
             subItemsCard.style.display = "block";
-            
-            // Auto switch mode to pack if analyzing a directory
-            if (media.is_dir) {
-                const lower = filePath.toLowerCase();
-                if (lower.includes("manga") || lower.includes("scan") || lower.includes("ebook")) {
-                    document.getElementById("select-release-mode").value = "manga_pack";
-                } else {
-                    document.getElementById("select-release-mode").value = "season_pack";
-                }
-            }
         } else {
             subItemsCard.style.display = "none";
         }
+
+        // Set mode from server or forced parameter
+        const effectiveMode = forcedMode || data.suggested_release_mode || "single";
+        document.getElementById("select-release-mode").value = effectiveMode;
+        updateModeBadge(effectiveMode);
 
         // Populate Editors
         document.getElementById("editor-nfo").value = data.nfo;
@@ -313,66 +311,119 @@ async function selectAndAnalyze(filePath) {
     }
 }
 
-function initGenerator() {
-    // Recalculate title when fields change
-    document.getElementById("btn-recalc-title").addEventListener("click", () => {
-        if (!currentAnalysis) return;
-        const mode = document.getElementById("select-release-mode").value;
-        const year = document.getElementById("input-year").value.trim();
-        const lang = document.getElementById("input-lang-tag").value.trim();
-        const source = document.getElementById("select-source").value;
-        const tag = document.getElementById("input-team-tag").value.trim();
+function updateModeBadge(mode) {
+    const badge = document.getElementById("badge-pack-mode");
+    const labels = {
+        single: "FILM / UNIQUE",
+        season_pack: "PACK SAISON",
+        episode: "ÉPISODE SEUL",
+        integrale: "INTÉGRALE",
+        manga_tome: "TOME MANGA",
+        manga_pack: "PACK MANGA"
+    };
+    if (badge) badge.textContent = labels[mode] || (mode ? mode.toUpperCase() : "MÉDIA");
+}
 
-        // Extract base title
-        let raw = currentAnalysis.media_info.file_name;
-        // Clean dots
-        let titlePart = raw.replace(/\b(19\d\d|20\d\d)\b.*$/, "").replace(/[\s_\-]+/g, ".").replace(/[^\w\.]/g, "").trim(".");
+function recalculateTitle() {
+    if (!currentAnalysis) return;
+    const mode = document.getElementById("select-release-mode").value;
+    const year = document.getElementById("input-year").value.trim();
+    const lang = document.getElementById("input-lang-tag").value.trim();
+    const source = document.getElementById("select-source").value;
+    const tag = document.getElementById("input-team-tag").value.trim() || "NOTAG";
 
-        const parts = [titlePart];
-        if (mode === "episode") {
-            const seMatch = raw.match(/\b(S\d\dE\d\d)\b/i);
-            if (year) parts.push(year);
-            parts.push(seMatch ? seMatch[1].toUpperCase() : "S01E01");
-        } else if (mode === "season_pack") {
-            const sMatch = raw.match(/\b(S\d\d)\b/i);
-            parts.push(sMatch ? sMatch[1].toUpperCase() : "S01");
-        } else if (mode === "integrale") {
-            if (year) parts.push(year);
-            parts.push("INTEGRALE");
-        } else if (year) {
-            parts.push(year);
+    let raw = currentAnalysis.media_info.file_name;
+    // Strip file extension
+    raw = raw.replace(/\.[a-zA-Z0-9]+$/, "");
+
+    // Clean title base (strip existing tokens, years, qualities)
+    let titlePart = raw
+        .replace(/\b(19\d\d|20\d\d)\b.*$/, "")
+        .replace(/\b(S\d{1,2}E\d{1,4}|S\d{1,2}|E\d{1,4}|Ep\d{1,4}|Episode[\s\.]*\d+|T\d{1,3}|Tome[\s\.]*\d+|INTEGRALE)\b/gi, "")
+        .replace(/\b(2160p|1080p|720p|576p|480p|BluRay|BDRip|BRRip|WEB-DL|WEBRip|WEB|HDTV|DVDRip|REMUX|x264|x265|HEVC|AVC|AAC|AC3|DTS|MULTI|VFF|VF2|VFQ|VFI|VOSTFR|TRUEFRENCH|FRENCH)\b.*$/gi, "")
+        .replace(/[\s_\-]+/g, ".")
+        .replace(/[^\w\.]/g, "")
+        .replace(/\.+/g, ".")
+        .trim(".");
+
+    if (!titlePart) titlePart = "Release";
+
+    const parts = [titlePart];
+
+    // Detect existing tokens from raw filename
+    const seMatch = raw.match(/\b(S\d{1,2}E\d{1,4})\b/i);
+    const sMatch = raw.match(/\b(S\d{1,2})\b/i);
+    const eMatch = raw.match(/\b(?:E|Ep|Episode[\s\.]*)(\d{1,4})\b/i);
+    const tMatch = raw.match(/\b(?:T|Tome|Vol|Volume[\s\.]*)(\d{1,3})\b/i);
+    const tRangeMatch = raw.match(/\b(T\d{1,3}[\-\.]T\d{1,3})\b/i);
+
+    if (mode === "episode") {
+        if (year) parts.push(year);
+        if (seMatch) {
+            parts.push(seMatch[1].toUpperCase());
+        } else if (sMatch && eMatch) {
+            parts.push(`${sMatch[1].toUpperCase()}E${parseInt(eMatch[1], 10).toString().padStart(2, '0')}`);
+        } else if (eMatch) {
+            parts.push(`E${parseInt(eMatch[1], 10).toString().padStart(2, '0')}`);
+        } else {
+            parts.push("S01E01");
         }
+    } else if (mode === "season_pack") {
+        parts.push(sMatch ? sMatch[1].toUpperCase() : "S01");
+    } else if (mode === "integrale") {
+        if (year) parts.push(year);
+        parts.push("INTEGRALE");
+    } else if (mode === "manga_tome") {
+        parts.push(tMatch ? `T${parseInt(tMatch[1], 10).toString().padStart(2, '0')}` : "T01");
+    } else if (mode === "manga_pack") {
+        parts.push(tRangeMatch ? tRangeMatch[1].toUpperCase() : "INTEGRALE");
+    } else if (mode === "single") {
+        if (year) parts.push(year);
+    }
 
+    const isBook = (mode === "manga_tome" || mode === "manga_pack");
+    if (isBook) {
+        if (lang) parts.push(lang);
+    } else {
         if (lang) parts.push(lang);
         if (currentAnalysis.media_info.resolution && currentAnalysis.media_info.resolution !== "Autre") parts.push(currentAnalysis.media_info.resolution);
         if (source) parts.push(source);
+        if (currentAnalysis.media_info.hdr_tags && currentAnalysis.media_info.hdr_tags.length > 0) parts.push(currentAnalysis.media_info.hdr_tags.join("."));
+        if (currentAnalysis.namer && currentAnalysis.namer.audio_spec) parts.push(currentAnalysis.namer.audio_spec);
         if (currentAnalysis.media_info.video_codec) parts.push(currentAnalysis.media_info.video_codec);
+    }
 
-        const newTitle = parts.join(".") + `-${tag || 'NOTAG'}`;
-        document.getElementById("input-release-title").value = newTitle;
+    const newTitle = parts.join(".") + `-${tag}`;
+    document.getElementById("input-release-title").value = newTitle;
+    
+    // Automatically re-run duplicate check on title change
+    checkDuplicatesC411(newTitle);
+}
+
+function initGenerator() {
+    // Recalculate title on button click
+    document.getElementById("btn-recalc-title").addEventListener("click", () => {
+        recalculateTitle();
         showToast("Titre réactualisé !", "info");
     });
 
-    // Mode Selector change
+    // Dynamic Mode Selector change (automatically updates title and category)
     document.getElementById("select-release-mode").addEventListener("change", (e) => {
         const mode = e.target.value;
-        const badge = document.getElementById("badge-pack-mode");
-        const labels = {
-            single: "FILM / UNIQUE",
-            season_pack: "PACK SAISON",
-            episode: "ÉPISODE SEUL",
-            integrale: "INTÉGRALE",
-            manga_pack: "PACK MANGA"
-        };
-        badge.textContent = labels[mode] || mode.toUpperCase();
+        updateModeBadge(mode);
+
+        const filePath = currentAnalysis ? (currentAnalysis.source_path || "").toLowerCase() : "";
+        const isAnime = filePath.includes("manga") && !filePath.includes("ebook") && !filePath.includes("scan");
 
         if (mode === "season_pack" || mode === "episode" || mode === "integrale") {
-            document.getElementById("select-category").value = "5000";
-        } else if (mode === "manga_pack") {
+            document.getElementById("select-category").value = isAnime ? "5070" : "5000";
+        } else if (mode === "manga_tome" || mode === "manga_pack") {
             document.getElementById("select-category").value = "7030";
+        } else if (mode === "single") {
+            document.getElementById("select-category").value = isAnime ? "2060" : "2000";
         }
 
-        document.getElementById("btn-recalc-title").click();
+        recalculateTitle();
     });
 
     // Check duplicate on C411 button
@@ -570,12 +621,40 @@ async function checkDuplicatesC411(releaseTitle) {
             <p class="text-xs mb-2 font-medium">${escapeHtml(data.status_text)}</p>
         `;
 
-        if (data.exact_duplicates && data.exact_duplicates.length > 0) {
-            html += `<div class="text-danger font-bold text-xs mb-1">🚨 Doublons stricts détectés :</div><ul class="text-xs mb-2" style="max-height: 100px; overflow-y: auto;">`;
-            data.exact_duplicates.forEach(item => {
+        // 1. Same team duplicate (Red prominent box)
+        if (data.same_tag_duplicates && data.same_tag_duplicates.length > 0) {
+            html += `
+                <div class="p-2 mb-2 rounded border border-danger" style="background-color: rgba(220, 53, 69, 0.18);">
+                    <div class="font-bold text-xs text-danger mb-1 flex items-center">
+                        <i class="fa-solid fa-ban mr-1"></i> DOUBLON DE VOTRE TEAM DÉTECTÉ (-${escapeHtml(data.matched_tag || tag)}) :
+                    </div>
+                    <ul class="text-xs mb-1" style="max-height: 120px; overflow-y: auto;">
+            `;
+            data.same_tag_duplicates.forEach(item => {
                 html += `
-                    <li class="py-1 border-b border-dark flex justify-between items-center text-danger">
-                        <span class="truncate mr-2" style="max-width: 250px;">${escapeHtml(item.title)}</span>
+                    <li class="py-1 flex justify-between items-center text-danger border-b border-dark">
+                        <span class="truncate mr-2 font-mono font-bold" style="max-width: 260px;" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</span>
+                        <span class="badge badge-danger"><strong>${item.seeders}S</strong> / ${item.size}</span>
+                    </li>
+                `;
+            });
+            html += `
+                    </ul>
+                    <div class="text-xs text-danger mt-1">⚠️ <strong>Refus certain</strong> : cette version existe déjà avec votre signature de team.</div>
+                </div>
+            `;
+        }
+
+        // 2. Same quality/format by another team
+        if (data.same_quality_duplicates && data.same_quality_duplicates.length > 0) {
+            html += `
+                <div class="text-warning font-bold text-xs mb-1"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Même résolution / format (autres teams) :</div>
+                <ul class="text-xs mb-2" style="max-height: 90px; overflow-y: auto;">
+            `;
+            data.same_quality_duplicates.forEach(item => {
+                html += `
+                    <li class="py-1 border-b border-dark flex justify-between items-center text-warning">
+                        <span class="truncate mr-2" style="max-width: 250px;" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</span>
                         <span><strong>${item.seeders}S</strong> / ${item.size}</span>
                     </li>
                 `;
@@ -583,12 +662,16 @@ async function checkDuplicatesC411(releaseTitle) {
             html += `</ul>`;
         }
 
+        // 3. Other qualities/versions
         if (data.other_versions && data.other_versions.length > 0) {
-            html += `<div class="text-muted text-xs mb-1">📁 Autres versions sur le site (qualité/source différente) :</div><ul class="text-xs" style="max-height: 80px; overflow-y: auto;">`;
+            html += `
+                <div class="text-muted text-xs mb-1"><i class="fa-solid fa-folder-open mr-1"></i> Autres versions sur C411 (qualités différentes autorisées) :</div>
+                <ul class="text-xs" style="max-height: 80px; overflow-y: auto;">
+            `;
             data.other_versions.slice(0, 4).forEach(item => {
                 html += `
                     <li class="py-1 border-b border-dark flex justify-between items-center text-muted">
-                        <span class="truncate mr-2" style="max-width: 250px;">${escapeHtml(item.title)}</span>
+                        <span class="truncate mr-2" style="max-width: 250px;" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</span>
                         <span>${item.seeders}S / ${item.size}</span>
                     </li>
                 `;

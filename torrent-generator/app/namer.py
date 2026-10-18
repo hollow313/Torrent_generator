@@ -151,58 +151,90 @@ class ReleaseNamer:
         # Language tag
         lang_tag = custom_lang or media_info.get("detected_lang_tag", "MULTI.VFF")
 
-        # Detect Season / Episode tokens (e.g. S01E05 or S01)
-        se_match = re.search(r"\b(S\d\dE\d\d)\b", raw_name, re.IGNORECASE)
-        s_match = re.search(r"\b(S\d\d)\b", raw_name, re.IGNORECASE)
-        if not se_match and media_info.get("embedded_title"):
-            se_match = re.search(r"\b(S\d\dE\d\d)\b", media_info["embedded_title"], re.IGNORECASE)
-        if not s_match and media_info.get("embedded_title"):
-            s_match = re.search(r"\b(S\d\d)\b", media_info["embedded_title"], re.IGNORECASE)
+        # Detect Season / Episode / Tome tokens (e.g. S01E05, S01, E1050, T01, T01-T20)
+        se_match = re.search(r"\b(S\d{1,2}E\d{1,4})\b", raw_name, re.IGNORECASE)
+        s_match = re.search(r"\b(S\d{1,2})\b", raw_name, re.IGNORECASE)
+        e_match = re.search(r"\b(?:E|Ep|Episode[\s\.]*)(\d{1,4})\b", raw_name, re.IGNORECASE)
+        t_match = re.search(r"\b(?:T|Tome|Vol|Volume[\s\.]*)(\d{1,3})\b", raw_name, re.IGNORECASE)
+        t_range_match = re.search(r"\b(T\d{1,3}[\-\.]T\d{1,3})\b", raw_name, re.IGNORECASE)
 
-        # Clean title base (strip SxxExx and year)
+        if not se_match and media_info.get("embedded_title"):
+            se_match = re.search(r"\b(S\d{1,2}E\d{1,4})\b", media_info["embedded_title"], re.IGNORECASE)
+        if not s_match and media_info.get("embedded_title"):
+            s_match = re.search(r"\b(S\d{1,2})\b", media_info["embedded_title"], re.IGNORECASE)
+
+        # Clean title base (strip SxxExx, year, qualities, codecs)
         title_clean = base_name
-        if se_match:
-            title_clean = title_clean.split(se_match.group(1))[0]
-        elif s_match:
-            title_clean = title_clean.split(s_match.group(1))[0]
-        elif year:
+        # Remove SxxExx, Sxx, Exx, Txx, INTEGRALE from title base
+        title_clean = re.sub(r"\b(S\d{1,2}E\d{1,4}|S\d{1,2}|E\d{1,4}|Ep\d{1,4}|Episode[\s\.]*\d+|T\d{1,3}|Tome[\s\.]*\d+|INTEGRALE)\b", "", title_clean, flags=re.IGNORECASE)
+        if year:
             title_clean = title_clean.split(year)[0]
+
+        # Strip common trailing tags/qualities from title_clean
+        title_clean = re.sub(r"\b(2160p|1080p|720p|576p|480p|BluRay|BDRip|BRRip|WEB-DL|WEBRip|WEB|HDTV|DVDRip|REMUX|x264|x265|HEVC|AVC|AAC|AC3|DTS|MULTI|VFF|VF2|VFQ|VFI|VOSTFR|TRUEFRENCH|FRENCH)\b.*$", "", title_clean, flags=re.IGNORECASE)
 
         title_part = cls.clean_title(title_clean)
         if not title_part:
             title_part = "Release"
 
-        # Construct final title based on C411 category schema:
+        # Construct final title based on C411 category & mode schema:
         parts = [title_part]
         
-        # Series handling
-        is_series = (category and "série" in category.lower()) or release_mode in ["episode", "season_pack", "integrale"]
-        if is_series:
-            if release_mode == "episode" or (release_mode == "single" and se_match):
-                token = se_match.group(1).upper() if se_match else "S01E01"
-                if year:
-                    parts.append(year)
-                parts.append(token)
-            elif release_mode == "season_pack" or (release_mode == "single" and s_match):
-                token = s_match.group(1).upper() if s_match else "S01"
-                parts.append(token)
-            elif release_mode == "integrale":
+        if release_mode == "episode":
+            if year:
+                parts.append(year)
+            if se_match:
+                parts.append(se_match.group(1).upper())
+            elif s_match and e_match:
+                s_num = int(re.sub(r"[^\d]", "", s_match.group(1)))
+                e_num = int(e_match.group(1))
+                parts.append(f"S{s_num:02d}E{e_num:02d}")
+            elif e_match:
+                e_num = int(e_match.group(1))
+                parts.append(f"E{e_num:02d}" if e_num < 100 else f"E{e_num}")
+            else:
+                parts.append("S01E01")
+        elif release_mode == "season_pack":
+            token = s_match.group(1).upper() if s_match else "S01"
+            parts.append(token)
+        elif release_mode == "integrale":
+            if year:
+                parts.append(year)
+            parts.append("INTEGRALE")
+        elif release_mode == "manga_tome":
+            if t_match:
+                t_num = int(t_match.group(1))
+                parts.append(f"T{t_num:02d}")
+            else:
+                parts.append("T01")
+        elif release_mode == "manga_pack":
+            if t_range_match:
+                parts.append(t_range_match.group(1).upper())
+            else:
                 parts.append("INTEGRALE")
-        elif year:
-            parts.append(year)
+        elif release_mode == "single":
+            if year:
+                parts.append(year)
 
-        if lang_tag:
-            parts.append(lang_tag)
-        if resolution and resolution != "Autre":
-            parts.append(resolution)
-        if source:
-            parts.append(source)
-        if hdr_str:
-            parts.append(hdr_str)
-        if audio_spec:
-            parts.append(audio_spec)
-        if video_codec:
-            parts.append(video_codec)
+        # Append technical specs (audio, video, etc.)
+        is_book = release_mode in ["manga_tome", "manga_pack"] or (category and ("ebook" in category.lower() or "livre" in category.lower() or "bd" in category.lower()))
+        if is_book:
+            if lang_tag:
+                parts.append(lang_tag)
+            # Books don't need resolution / video codecs
+        else:
+            if lang_tag:
+                parts.append(lang_tag)
+            if resolution and resolution != "Autre":
+                parts.append(resolution)
+            if source:
+                parts.append(source)
+            if hdr_str:
+                parts.append(hdr_str)
+            if audio_spec:
+                parts.append(audio_spec)
+            if video_codec:
+                parts.append(video_codec)
 
         full_title = ".".join(parts) + f"-{chosen_tag}"
 
