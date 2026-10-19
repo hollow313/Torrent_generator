@@ -103,6 +103,8 @@ class GenerateRequest(BaseModel):
     tmdb_id: Optional[int] = None
     imdb_id: Optional[str] = None
     poster_url: Optional[str] = None
+    rename_on_disk: Optional[bool] = False
+    release_mode: Optional[str] = "single"
 
 class SearchC411Request(BaseModel):
     query: str
@@ -344,9 +346,29 @@ async def generate_torrent(req: GenerateRequest):
     with open(nfo_path, "w", encoding="utf-8", errors="replace") as nf:
         nf.write(req.nfo_content)
 
-    # 2. Build .torrent file
+    # 2. Determine effective source path
+    actual_source_path = req.source_path
+    if os.path.isdir(req.source_path) and req.release_mode == "single":
+        # Target the main video file directly so Plex artworks (backdrop.jpg, folder.jpg) are excluded
+        m_info = MediaAnalyzer.get_media_info(req.source_path)
+        if m_info.get("main_file_path") and os.path.exists(m_info["main_file_path"]):
+            actual_source_path = m_info["main_file_path"]
+
+    # Optional physical rename on disk if user explicitly checked the option
+    if req.rename_on_disk and os.path.exists(actual_source_path):
+        dir_name = os.path.dirname(actual_source_path)
+        if os.path.isfile(actual_source_path):
+            ext = os.path.splitext(actual_source_path)[1]
+            new_path = os.path.join(dir_name, f"{req.release_name}{ext}")
+        else:
+            new_path = os.path.join(dir_name, req.release_name)
+        if actual_source_path != new_path:
+            os.rename(actual_source_path, new_path)
+            actual_source_path = new_path
+
+    # 3. Build .torrent file
     builder = TorrentBuilder(
-        source_path=req.source_path,
+        source_path=actual_source_path,
         release_name=req.release_name,
         primary_announce=primary_announce,
         backup_announce=backup_announce,
@@ -362,7 +384,7 @@ async def generate_torrent(req: GenerateRequest):
         "id": info_hash,
         "name": req.release_name,
         "category_id": req.category_id,
-        "source_path": req.source_path,
+        "source_path": actual_source_path,
         "torrent_path": torrent_path.replace("\\", "/"),
         "nfo_path": nfo_path.replace("\\", "/"),
         "size_bytes": builder.total_size,
@@ -378,6 +400,7 @@ async def generate_torrent(req: GenerateRequest):
         "message": "Fichier .torrent et .nfo générés avec succès !",
         "torrent_path": torrent_path.replace("\\", "/"),
         "nfo_path": nfo_path.replace("\\", "/"),
+        "effective_source_path": actual_source_path.replace("\\", "/"),
         "torrent_filename": torrent_filename,
         "nfo_filename": nfo_filename,
         "info_hash": info_hash,
@@ -611,18 +634,28 @@ async def mass_scan(req: MassScanRequest):
         src_match = re.search(r"\b(BluRay|BDRip|BRRip|WEB-DL|WEBRip|WEB|HDTV|DVDRip|REMUX)\b", name, re.IGNORECASE)
         source = src_match.group(1) if src_match else item.get("source", "WEB")
 
-        tag_match = re.search(r"-([A-Za-z0-9_]+)(?:\.[a-zA-Z0-9]+)?$", name)
-        tag = tag_match.group(1) if tag_match else item.get("tag", "NOTAG")
+        ext_tag, _ = ReleaseNamer.extract_existing_tag(name)
+        tag = ext_tag if ext_tag else "NOTAG"
 
         # Clean release title for presentation
         clean_title = ReleaseNamer.clean_title(item["name"])
+
+        # Determine category for C411 Torznab query
+        cat_id = None
+        if "films" in folder_lower:
+            cat_id = "2000"
+        elif "series" in folder_lower:
+            cat_id = "2010"
+        elif "mangas" in folder_lower or "manga" in folder_lower:
+            cat_id = "2020"
 
         # Check duplicates on C411
         dupe_res = await tracker.check_duplicates(
             title=name,
             resolution=resolution,
             source=source,
-            tag=tag
+            tag=tag,
+            category_id=cat_id
         )
 
         status = "green"

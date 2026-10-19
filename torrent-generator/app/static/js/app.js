@@ -289,11 +289,17 @@ async function selectAndAnalyze(filePath, forcedMode = null) {
             document.getElementById("select-category").value = data.suggested_category_id;
         }
 
-        // TMDB query prefill
-        const baseNameGuess = (media.file_name || filePath.split("/").pop() || "")
-            .replace(/\b(19\d\d|20\d\d)\b.*$/, "")
-            .replace(/[\._\-]/g, " ")
-            .trim();
+        // TMDB query prefill (clean movie / series title without parentheses or year)
+        let baseNameGuess = (namer && namer.clean_title) ? namer.clean_title : "";
+        if (!baseNameGuess) {
+            baseNameGuess = (media.file_name || filePath.split("/").pop() || "")
+                .replace(/[\(\[\{]\s*(?:19\d\d|20\d\d)\s*[\)\]\}].*$/, "")
+                .replace(/\b(?:19\d\d|20\d\d)\b.*$/, "")
+                .replace(/[\._\-]+/g, " ")
+                .replace(/[^\w\s]/g, " ")
+                .replace(/\s+/g, " ")
+                .trim();
+        }
         document.getElementById("tmdb-search-input").value = baseNameGuess;
 
         // Sub-items handling (Episodes in folder or Manga tomes)
@@ -372,6 +378,7 @@ function recalculateTitle() {
 
     // Clean title base (strip existing tokens, years, qualities)
     let titlePart = raw
+        .replace(/[\(\[\{]\s*(?:19\d\d|20\d\d)\s*[\)\]\}].*$/, "")
         .replace(/\b(19\d\d|20\d\d)\b.*$/, "")
         .replace(/\b(S\d{1,2}E\d{1,4}|S\d{1,2}|E\d{1,4}|Ep\d{1,4}|Episode[\s\.]*\d+|T\d{1,3}|Tome[\s\.]*\d+|INTEGRALE)\b/gi, "")
         .replace(/\b(2160p|1080p|720p|576p|480p|BluRay|BDRip|BRRip|WEB-DL|WEBRip|WEB|HDTV|DVDRip|REMUX|x264|x265|HEVC|AVC|AAC|AC3|DTS|MULTI|VFF|VF2|VFQ|VFI|VOSTFR|TRUEFRENCH|FRENCH)\b.*$/gi, "")
@@ -506,6 +513,8 @@ function initGenerator() {
         const payload = {
             source_path: currentAnalysis.source_path,
             release_name: releaseName,
+            release_mode: document.getElementById("select-release-mode").value,
+            rename_on_disk: document.getElementById("chk-rename-on-disk") ? document.getElementById("chk-rename-on-disk").checked : false,
             category_id: parseInt(document.getElementById("select-category").value),
             piece_size: parseInt(document.getElementById("select-piece-size").value),
             nfo_content: document.getElementById("editor-nfo").value,
@@ -535,6 +544,7 @@ function initGenerator() {
 
             const data = await res.json();
             currentGeneratedData = data;
+            currentGeneratedData.effective_source_path = data.effective_source_path || currentAnalysis.source_path;
             currentGeneratedData.release_name = releaseName;
             currentGeneratedData.category_id = payload.category_id;
             currentGeneratedData.bbcode = payload.bbcode_content;
@@ -613,7 +623,7 @@ function initGenerator() {
 
         const payload = {
             torrent_path: currentGeneratedData.torrent_path,
-            source_path: currentAnalysis.source_path
+            source_path: currentGeneratedData.effective_source_path || currentAnalysis.source_path
         };
 
         try {

@@ -193,17 +193,37 @@ class MediaAnalyzer:
                 "title": sub_title
             })
 
-        # Language tag determination
-        lang_tag = "MULTI"
-        if has_french and (len(audios) > 1 or has_english):
+        # Language tag determination (inspect filename, embedded title and track titles)
+        check_text = f"{os.path.basename(file_path)} {general.get('Title', '')} {videos[0].get('Title', '') if videos else ''}"
+        for a in audios:
+            check_text += f" {a.get('Title', '')}"
+
+        detected_fr_variant = None
+        for variant in ["TRUEFRENCH", "VF2", "VFQ", "VFI", "VOSTFR", "VFF", "FRENCH"]:
+            if re.search(rf"\b{variant}\b", check_text, re.IGNORECASE):
+                detected_fr_variant = variant.upper()
+                if detected_fr_variant == "FRENCH":
+                    detected_fr_variant = "VFF"
+                break
+
+        has_multi = "multi" in check_text.lower() or (len(audios) > 1 and (has_french or has_english))
+
+        if detected_fr_variant:
+            if detected_fr_variant == "VOSTFR":
+                lang_tag = "MULTI.VOSTFR" if has_multi else "VOSTFR"
+            else:
+                lang_tag = f"MULTI.{detected_fr_variant}" if has_multi else detected_fr_variant
+        elif has_french and has_multi:
             lang_tag = "MULTI.VFF"
-        elif has_french and len(audios) == 1:
+        elif has_french:
             lang_tag = "VFF"
         elif not has_french and has_english:
-            if any(s.get("language") == "Français" for s in sub_details):
+            if any(s.get("language") == "Français" for s in sub_details) or "vostfr" in check_text.lower():
                 lang_tag = "VOSTFR"
             else:
                 lang_tag = "ENGLISH"
+        else:
+            lang_tag = "MULTI.VFF" if has_multi else "VFF"
 
         # Duration formatting
         duration_sec = float(general.get("Duration", 0) or 0)

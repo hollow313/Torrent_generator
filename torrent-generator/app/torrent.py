@@ -105,6 +105,8 @@ class TorrentBuilder:
                 dirs.sort()
                 files.sort()
                 for file in files:
+                    if file.startswith(".") or file.lower() in ["thumbs.db", "desktop.ini", ".ds_store"]:
+                        continue
                     full_path = os.path.join(root, file)
                     rel_path = os.path.relpath(full_path, self.source_path)
                     parts = rel_path.replace("\\", "/").split("/")
@@ -170,10 +172,12 @@ class TorrentBuilder:
             info["source"] = self.source_tag
             
         if not self.is_dir:
-            info["name"] = self.release_name or os.path.basename(self.source_path)
+            # Single file: info["name"] must match filename on disk for qBittorrent to seed immediately
+            info["name"] = os.path.basename(self.source_path)
             info["length"] = self.total_size
         else:
-            info["name"] = self.release_name or os.path.basename(self.source_path)
+            # Folder / Multi-file: info["name"] must match folder name on disk
+            info["name"] = os.path.basename(self.source_path)
             torrent_files = []
             for _, size, parts in self.files_info:
                 torrent_files.append({

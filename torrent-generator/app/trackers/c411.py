@@ -209,9 +209,20 @@ class C411Tracker(BaseTracker):
         year_match = re.search(r"\b(19\d\d|20\d\d)\b", clean)
         year = year_match.group(1) if year_match else ""
         if year:
-            core_words = clean.split(year)[0].strip() + f" {year}"
+            raw_base = clean.split(year)[0]
         else:
-            core_words = clean.split()[0] if clean.split() else clean
+            raw_base = clean
+
+        # Strip all punctuation, parentheses, brackets, hyphens
+        clean_base = re.sub(r"[^\w\s]", " ", raw_base)
+        # Strip common quality / codec terms from core base
+        clean_base = re.sub(r"\b(2160p|1080p|720p|576p|480p|BluRay|BDRip|BRRip|WEB|WEBRip|WEB-DL|HDTV|REMUX|x264|x265|HEVC|AVC)\b", " ", clean_base, flags=re.IGNORECASE)
+        clean_base = re.sub(r"\s+", " ", clean_base).strip()
+
+        if year:
+            core_words = f"{clean_base} {year}".strip()
+        else:
+            core_words = clean_base or (clean.split()[0] if clean.split() else clean)
 
         results = await self.search(core_words, category_id=category_id)
         if not results:

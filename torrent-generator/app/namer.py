@@ -182,6 +182,8 @@ class ReleaseNamer:
         title_clean = base_name
         # Remove SxxExx, Sxx, Exx, Txx, INTEGRALE from title base
         title_clean = re.sub(r"\b(S\d{1,2}E\d{1,4}|S\d{1,2}|E\d{1,4}|Ep\d{1,4}|Episode[\s\.]*\d+|T\d{1,3}|Tome[\s\.]*\d+|INTEGRALE)\b", "", title_clean, flags=re.IGNORECASE)
+        # Remove (19xx|20xx) or [19xx|20xx]
+        title_clean = re.sub(r"[\(\[\{]\s*(?:19\d\d|20\d\d)\s*[\)\]\}]", "", title_clean)
         if year:
             title_clean = title_clean.split(year)[0]
 
@@ -269,6 +271,7 @@ class ReleaseNamer:
 
         return {
             "title": full_title,
+            "clean_title": title_part.replace(".", " "),
             "detected_tag": existing_tag,
             "final_tag": chosen_tag,
             "detag_warning": detag_warning,
