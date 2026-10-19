@@ -146,6 +146,16 @@
                                     <option value="mangas">📚 Mangas (Vidéos ou Ebooks / Scans)</option>
                                 </select>
                             </div>
+                            <div class="form-group" style="max-width: 170px;">
+                                <label class="form-label">Limite d'éléments</label>
+                                <select id="scanner-limit-select" class="input">
+                                    <option value="50">50 éléments</option>
+                                    <option value="100">100 éléments</option>
+                                    <option value="250">250 éléments</option>
+                                    <option value="500" selected>500 (Tout le dossier)</option>
+                                    <option value="1000">1000 éléments</option>
+                                </select>
+                            </div>
                             <div class="form-group flex items-end">
                                 <button class="btn btn-primary w-full" id="btn-start-mass-scan" style="height: 42px;">
                                     <i class="fa-solid fa-magnifying-glass-chart mr-2"></i> Lancer l'Analyse Globale
@@ -671,8 +681,11 @@
                                 </div>
 
                                 <div class="form-group mb-3">
-                                    <label class="form-label text-xs">Chemin équivalent sur votre serveur :</label>
-                                    <input type="text" id="cfg-qb-map-to" class="input font-mono text-sm" placeholder="ex: /mnt/donnees/medias">
+                                    <label class="form-label text-xs">Chemin équivalent vu par qBittorrent :</label>
+                                    <input type="text" id="cfg-qb-map-to" class="input font-mono text-sm" placeholder="ex: /plex ou /downloads">
+                                    <small class="form-hint" style="color: #38bdf8;">
+                                        💡 <strong>Crucial :</strong> Indiquez le chemin de montage <u>interne</u> au conteneur qBittorrent (ex: <code>/plex</code> si le pool y est monté sous <code>/plex</code>, et non le chemin ZFS hôte <code>/mnt/Plex/Plex</code>).
+                                    </small>
                                 </div>
                             </div>
 

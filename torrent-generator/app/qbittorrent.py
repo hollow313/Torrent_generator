@@ -111,10 +111,12 @@ class QBittorrentClient:
         self,
         torrent_file_path: str,
         source_data_path: str,
-        paused: bool = False
+        paused: bool = False,
+        info_hash: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Injects the generated .torrent file into qBittorrent pointing to the translated media directory.
+        Automatically triggers a hash recheck so existing files verify to 100% and start seeding immediately.
         """
         if not os.path.exists(torrent_file_path):
             return {"success": False, "message": f"Fichier .torrent introuvable : {torrent_file_path}"}
@@ -142,20 +144,30 @@ class QBittorrentClient:
                 "category": self.category,
                 "tags": self.tags,
                 "paused": "true" if paused else "false",
-                "skip_checking": "false",  # Forces checking at 100%
+                "skip_checking": "false",
                 "autoTMM": "false"
             }
 
             resp = await client.post(add_url, data=data, files=files)
-            await client.aclose()
 
             if resp.status_code == 200 and "Fails" not in resp.text:
+                # Trigger automatic recheck so qBittorrent verifies the file on disk to 100%
+                if info_hash:
+                    try:
+                        import asyncio
+                        await asyncio.sleep(0.5)
+                        await client.post(f"{self.base_url}/api/v2/torrents/recheck", data={"hashes": info_hash})
+                    except Exception as recheck_err:
+                        print(f"[qBittorrent] Auto-recheck error: {recheck_err}")
+
+                await client.aclose()
                 return {
                     "success": True,
-                    "message": f"Torrent ajouté à qBittorrent avec succès (dossier: {save_path}) !",
+                    "message": f"Torrent ajouté à qBittorrent avec succès (dossier: {save_path}) ! Vérification du seed lancée.",
                     "save_path": save_path
                 }
             else:
+                await client.aclose()
                 return {
                     "success": False,
                     "message": f"qBittorrent a renvoyé : {resp.text} (HTTP {resp.status_code})"

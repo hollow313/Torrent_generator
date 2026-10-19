@@ -623,7 +623,8 @@ function initGenerator() {
 
         const payload = {
             torrent_path: currentGeneratedData.torrent_path,
-            source_path: currentGeneratedData.effective_source_path || currentAnalysis.source_path
+            source_path: currentGeneratedData.effective_source_path || currentAnalysis.source_path,
+            info_hash: currentGeneratedData.info_hash
         };
 
         try {
@@ -923,12 +924,14 @@ async function runMassScan() {
     btnScan.disabled = true;
 
     try {
+        const limitVal = parseInt(document.getElementById("scanner-limit-select")?.value || "500", 10);
         const res = await fetch("/api/mass-scan", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 folder_path: folderInput,
                 mode: modeSelect,
+                limit: limitVal,
                 check_c411: true
             })
         });

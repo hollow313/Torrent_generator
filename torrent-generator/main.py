@@ -125,6 +125,7 @@ class AddQBittorrentRequest(BaseModel):
     torrent_path: str
     source_path: str
     paused: Optional[bool] = None
+    info_hash: Optional[str] = None
 
 class TmdbSearchRequest(BaseModel):
     query: str
@@ -134,7 +135,7 @@ class TmdbSearchRequest(BaseModel):
 class MassScanRequest(BaseModel):
     folder_path: str
     scan_mode: Optional[str] = "auto"  # auto, films, series_season, series_episode, mangas
-    limit: Optional[int] = 30
+    limit: Optional[int] = 500
 
 def render_template(template_name: str, request: Request, context: Optional[Dict[str, Any]] = None):
     ctx = dict(context or {})
@@ -469,7 +470,8 @@ async def add_qbittorrent(req: AddQBittorrentRequest):
     res = await client.add_torrent(
         torrent_file_path=req.torrent_path,
         source_data_path=req.source_path,
-        paused=paused
+        paused=paused,
+        info_hash=req.info_hash
     )
     return res
 
@@ -532,7 +534,7 @@ async def mass_scan(req: MassScanRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur d'accès au dossier : {e}")
 
-    limit = req.limit or 150
+    limit = req.limit or 500
     for entry in entries:
         if len(candidates) >= limit:
             break
