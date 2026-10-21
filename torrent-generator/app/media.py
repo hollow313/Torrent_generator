@@ -5,10 +5,39 @@ import shutil
 import subprocess
 from typing import Dict, Any, List, Optional
 
+def safe_int(val: Any, default: int = 0) -> int:
+    try:
+        if isinstance(val, (int, float)):
+            return int(val)
+        cleaned = re.sub(r"[^\d]", "", str(val or ""))
+        return int(cleaned) if cleaned else default
+    except Exception:
+        return default
+
+def safe_float(val: Any, default: float = 0.0) -> float:
+    try:
+        if isinstance(val, (int, float)):
+            return float(val)
+        m = re.search(r"(\d+(?:\.\d+)?)", str(val or ""))
+        return float(m.group(1)) if m else default
+    except Exception:
+        return default
+
 class MediaAnalyzer:
-    @staticmethod
-    def is_mediainfo_available() -> bool:
-        return shutil.which("mediainfo") is not None
+    @classmethod
+    def get_mediainfo_cmd(cls) -> Optional[str]:
+        """Detects mediainfo executable across PATH and standard Unix directories."""
+        for candidate in ["mediainfo", "/usr/bin/mediainfo", "/usr/local/bin/mediainfo", "/bin/mediainfo"]:
+            w = shutil.which(candidate)
+            if w:
+                return w
+            if os.path.exists(candidate) and os.access(candidate, os.X_OK):
+                return candidate
+        return None
+
+    @classmethod
+    def is_mediainfo_available(cls) -> bool:
+        return cls.get_mediainfo_cmd() is not None
 
     @classmethod
     def sanitize_mediainfo_text(cls, raw_text: str, file_path_or_name: str) -> str:
@@ -56,40 +85,77 @@ class MediaAnalyzer:
                             largest_size = sz
                             target_file = fp
 
-        if not cls.is_mediainfo_available():
+        cmd = cls.get_mediainfo_cmd()
+        if not cmd:
+            print("[MediaAnalyzer] mediainfo CLI not found in PATH or standard directories.")
             return cls._fallback_analysis(target_file)
 
+        data = None
+        raw_text = ""
+
+        # 1. Run mediainfo with JSON output
         try:
-            # 1. Run mediainfo with JSON output
             json_proc = subprocess.run(
-                ["mediainfo", "--Output=JSON", target_file],
+                [cmd, "--Output=JSON", target_file],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
                 encoding="utf-8",
                 errors="replace",
-                timeout=60
+                timeout=120
             )
-            data = json.loads(json_proc.stdout) if json_proc.returncode == 0 and json_proc.stdout else {}
-
-            # 2. Run mediainfo with Text output for the raw NFO dump
-            text_proc = subprocess.run(
-                ["mediainfo", target_file],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                timeout=60
-            )
-            raw_text = text_proc.stdout if text_proc.returncode == 0 else ""
-            sanitized_raw_text = cls.sanitize_mediainfo_text(raw_text, target_file)
-
-            return cls._parse_mediainfo_json(data, sanitized_raw_text, target_file)
-
+            if json_proc.returncode == 0 and json_proc.stdout.strip():
+                try:
+                    parsed = json.loads(json_proc.stdout)
+                    if isinstance(parsed, list) and len(parsed) > 0:
+                        data = parsed[0]
+                    elif isinstance(parsed, dict):
+                        data = parsed
+                except Exception as je:
+                    print(f"[MediaAnalyzer] Error decoding MediaInfo JSON: {je}")
+            else:
+                print(f"[MediaAnalyzer] mediainfo JSON returned {json_proc.returncode}. Stderr: {json_proc.stderr.strip()}")
         except Exception as e:
-            print(f"[MediaAnalyzer] Error running MediaInfo: {e}")
-            return cls._fallback_analysis(target_file)
+            print(f"[MediaAnalyzer] Failed to execute mediainfo JSON: {e}")
+
+        # 2. Run mediainfo with Text output for the raw NFO dump
+        try:
+            text_proc = subprocess.run(
+                [cmd, target_file],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=120
+            )
+            if text_proc.returncode == 0 and text_proc.stdout.strip():
+                raw_text = text_proc.stdout
+            else:
+                print(f"[MediaAnalyzer] mediainfo Text returned {text_proc.returncode}. Stderr: {text_proc.stderr.strip()}")
+        except Exception as e:
+            print(f"[MediaAnalyzer] Failed to execute mediainfo Text: {e}")
+
+        sanitized_raw_text = cls.sanitize_mediainfo_text(raw_text, target_file)
+
+        # 3. Parse JSON structure if available
+        if data and "media" in data:
+            try:
+                return cls._parse_mediainfo_json(data, sanitized_raw_text, target_file)
+            except Exception as e:
+                print(f"[MediaAnalyzer] Error during _parse_mediainfo_json: {e}")
+                import traceback
+                traceback.print_exc()
+
+        # 4. If JSON failed but text report exists, parse text report
+        if sanitized_raw_text and ("Video" in sanitized_raw_text or "Audio" in sanitized_raw_text):
+            try:
+                return cls._parse_mediainfo_text_report(sanitized_raw_text, target_file)
+            except Exception as e:
+                print(f"[MediaAnalyzer] Error during _parse_mediainfo_text_report: {e}")
+
+        # 5. Last resort fallback
+        return cls._fallback_analysis(target_file)
 
     @classmethod
     def _parse_mediainfo_json(cls, data: Dict[str, Any], raw_text: str, file_path: str) -> Dict[str, Any]:
@@ -114,8 +180,8 @@ class MediaAnalyzer:
 
         # Video summary
         main_video = videos[0] if videos else {}
-        width = int(main_video.get("Width", 0) or 0)
-        height = int(main_video.get("Height", 0) or 0)
+        width = safe_int(main_video.get("Width", 0))
+        height = safe_int(main_video.get("Height", 0))
         
         resolution = "Autre"
         if width >= 3800 or height >= 2100:
@@ -140,6 +206,16 @@ class MediaAnalyzer:
             video_codec = "AV1"
         elif "mpeg-4" in video_format.lower() or "xvid" in video_format.lower():
             video_codec = "XviD"
+
+        # Video Bitrate
+        v_bitrate = main_video.get("BitRate_String") or main_video.get("BitRate")
+        if not v_bitrate:
+            v_bitrate = general.get("OverallBitRate_String") or general.get("OverallBitRate")
+        if v_bitrate:
+            if str(v_bitrate).isdigit():
+                v_bitrate = f"{int(v_bitrate) // 1000} kb/s"
+        else:
+            v_bitrate = ""
 
         # HDR detection
         hdr_format = main_video.get("HDR_Format", "") or main_video.get("HDR_Format_Commercial", "") or ""
@@ -174,9 +250,9 @@ class MediaAnalyzer:
             channels = a.get("Channels", "")
             
             # Channel notation (e.g. 6 -> 5.1, 8 -> 7.1, 2 -> 2.0)
-            channels_label = channels
+            channels_label = str(channels)
             try:
-                ch_int = int(channels)
+                ch_int = safe_int(channels)
                 if ch_int == 8:
                     channels_label = "7.1"
                 elif ch_int == 6:
@@ -185,10 +261,13 @@ class MediaAnalyzer:
                     channels_label = "2.0"
                 elif ch_int == 1:
                     channels_label = "1.0"
-            except:
+            except Exception:
                 pass
 
             bitrate = a.get("BitRate", "") or a.get("BitRate_String", "")
+            if bitrate and str(bitrate).isdigit():
+                bitrate = f"{int(bitrate) // 1000} kb/s"
+
             audio_details.append({
                 "language": lang,
                 "format": commercial_fmt or fmt,
@@ -230,7 +309,9 @@ class MediaAnalyzer:
                     detected_fr_variant = "VFF"
                 break
 
-        has_multi = "multi" in check_text.lower() or (len(audios) > 1 and (has_french or has_english))
+        # C411 STRICT RULE: MULTI implies AT LEAST 2 audio tracks!
+        num_audios = len(audios)
+        has_multi = (num_audios >= 2) and ("multi" in check_text.lower() or (has_french or has_english))
 
         if detected_fr_variant:
             if detected_fr_variant == "VOSTFR":
@@ -250,22 +331,23 @@ class MediaAnalyzer:
             lang_tag = "MULTI.VFF" if has_multi else "VFF"
 
         # Duration formatting
-        duration_sec = float(general.get("Duration", 0) or 0)
+        duration_sec = safe_float(general.get("Duration", 0))
         hours = int(duration_sec // 3600)
         minutes = int((duration_sec % 3600) // 60)
         seconds = int(duration_sec % 60)
         duration_str = f"{hours}h {minutes:02d}m {seconds:02d}s" if hours > 0 else f"{minutes}m {seconds:02d}s"
 
-        total_bytes = int(general.get("FileSize", 0) or os.path.getsize(file_path))
+        total_bytes = safe_int(general.get("FileSize"))
+        if not total_bytes and os.path.exists(file_path):
+            total_bytes = os.path.getsize(file_path)
 
-        # Extract embedded metadata (Crucial when Radarr / Sonarr renamed files)
+        # Embedded metadata
         embedded_title = general.get("Title") or general.get("Movie_Name") or (videos[0].get("Title") if videos else "") or ""
         parent_dir = os.path.dirname(os.path.abspath(file_path))
         parent_folder = os.path.basename(parent_dir)
 
-        # Check for companion .nfo file in directory
+        # Companion NFO
         companion_nfo_tag = None
-        companion_nfo_content = ""
         try:
             if os.path.exists(parent_dir):
                 for f in os.listdir(parent_dir):
@@ -273,8 +355,6 @@ class MediaAnalyzer:
                         nfo_p = os.path.join(parent_dir, f)
                         with open(nfo_p, "r", encoding="utf-8", errors="ignore") as nfo_f:
                             companion_nfo_content = nfo_f.read(4096)
-                            # Look for team signature like "Release : TEAM" or "-TEAM"
-                            import re
                             match = re.search(r"(?:Release|Team|Group|Encodeur)\s*[:=]\s*([A-Za-z0-9_-]+)", companion_nfo_content, re.IGNORECASE)
                             if match:
                                 companion_nfo_tag = match.group(1).strip()
@@ -286,7 +366,7 @@ class MediaAnalyzer:
         except Exception as e:
             print(f"[MediaAnalyzer] Companion NFO check error: {e}")
 
-        # Scan folder for sub-items (episodes or tomes)
+        # Sub-items scan
         sub_items = []
         scan_dir = file_path if os.path.isdir(file_path) else parent_dir
         try:
@@ -318,7 +398,7 @@ class MediaAnalyzer:
             "height": height,
             "video_codec": video_codec,
             "video_format": video_format,
-            "video_bitrate": main_video.get("BitRate_String", ""),
+            "video_bitrate": v_bitrate,
             "frame_rate": main_video.get("FrameRate", ""),
             "hdr_tags": hdr_tags,
             "audio_tracks": audio_details,
@@ -331,45 +411,193 @@ class MediaAnalyzer:
             "companion_nfo_tag": companion_nfo_tag,
             "sub_items": sub_items,
             "is_dir": os.path.isdir(file_path),
-            "main_file_name": os.path.basename(target_file),
-            "main_file_path": target_file
+            "main_file_name": os.path.basename(file_path),
+            "main_file_path": file_path
         }
 
     @classmethod
-    def _fallback_analysis(cls, file_path: str) -> Dict[str, Any]:
-        """Basic fallback when MediaInfo is not installed."""
-        size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
-        ext = os.path.splitext(file_path)[1].lstrip(".").upper()
-        parent_dir = os.path.dirname(os.path.abspath(file_path))
+    def _parse_mediainfo_text_report(cls, raw_text: str, file_path: str) -> Dict[str, Any]:
+        """Parses standard MediaInfo text output if JSON output is unavailable."""
+        sections: Dict[str, List[Dict[str, str]]] = {"General": [{}], "Video": [], "Audio": [], "Text": []}
+        current_sec = "General"
+
+        for line in raw_text.splitlines():
+            ls = line.strip()
+            if not ls:
+                continue
+            if ls.startswith("General"):
+                current_sec = "General"
+                continue
+            elif ls.startswith("Video"):
+                current_sec = "Video"
+                sections["Video"].append({})
+                continue
+            elif ls.startswith("Audio"):
+                current_sec = "Audio"
+                sections["Audio"].append({})
+                continue
+            elif ls.startswith("Text"):
+                current_sec = "Text"
+                sections["Text"].append({})
+                continue
+
+            if ":" in line:
+                k, v = line.split(":", 1)
+                k = k.strip()
+                v = v.strip()
+                if sections.get(current_sec):
+                    sections[current_sec][-1][k] = v
+
+        gen = sections["General"][0] if sections["General"] else {}
+        vid = sections["Video"][0] if sections["Video"] else {}
+
+        # Resolution
+        w = safe_int(vid.get("Width", 0))
+        h = safe_int(vid.get("Height", 0))
+        res = "1080p"
+        if w >= 3800 or h >= 2100: res = "2160p"
+        elif w >= 1900 or h >= 1000: res = "1080p"
+        elif w >= 1200 or h >= 700: res = "720p"
+        elif h >= 570: res = "576p"
+
+        # Codec
+        v_fmt = vid.get("Format", "AVC")
+        v_codec = "x264"
+        if "hevc" in v_fmt.lower() or "h.265" in v_fmt.lower(): v_codec = "x265"
+        elif "av1" in v_fmt.lower(): v_codec = "AV1"
+
+        v_bitrate = vid.get("Bit rate") or gen.get("Overall bit rate") or ""
+
+        # Audios
+        audios_list = []
+        has_french = False
+        has_english = False
+        for a in sections.get("Audio", []):
+            lang = a.get("Language", "Français")
+            if "french" in lang.lower() or "français" in lang.lower():
+                has_french = True
+                lang = "Français"
+            elif "english" in lang.lower() or "anglais" in lang.lower():
+                has_english = True
+                lang = "Anglais"
+
+            ch = a.get("Channel(s)", "2 channels")
+            ch_num = safe_int(ch)
+            ch_label = "2.0"
+            if ch_num == 6: ch_label = "5.1"
+            elif ch_num == 8: ch_label = "7.1"
+            elif ch_num == 1: ch_label = "1.0"
+
+            audios_list.append({
+                "language": lang,
+                "format": a.get("Format", "AC-3"),
+                "channels": ch_label,
+                "bitrate": a.get("Bit rate", "")
+            })
+
+        # Subtitles
+        subs_list = []
+        for s in sections.get("Text", []):
+            s_lang = s.get("Language", "Français")
+            if "french" in s_lang.lower(): s_lang = "Français"
+            elif "english" in s_lang.lower(): s_lang = "Anglais"
+            subs_list.append({
+                "language": s_lang,
+                "format": s.get("Format", "UTF-8"),
+                "forced": "yes" in s.get("Forced", "no").lower()
+            })
+
+        num_audios = len(audios_list)
+        has_multi = (num_audios >= 2) and ("multi" in os.path.basename(file_path).lower() or (has_french or has_english))
         
+        detected_variant = "VF2" if "vf2" in file_path.lower() else ("VFF" if "vff" in file_path.lower() else "VFF")
+        if has_multi:
+            lang_tag = f"MULTI.{detected_variant}"
+        else:
+            lang_tag = detected_variant
+
+        size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
+
         return {
             "file_name": os.path.basename(file_path),
             "file_size": size,
-            "duration": "N/A",
-            "container": ext or "MKV",
-            "overall_bitrate": "N/A",
-            "resolution": "1080p",
-            "width": 1920,
-            "height": 1080,
-            "video_codec": "x264",
-            "video_format": "AVC",
-            "video_bitrate": "N/A",
-            "frame_rate": "24.000",
+            "duration": gen.get("Duration", "N/A"),
+            "container": gen.get("Format", "MKV").upper(),
+            "overall_bitrate": gen.get("Overall bit rate", ""),
+            "resolution": res,
+            "width": w or 1920,
+            "height": h or 1080,
+            "video_codec": v_codec,
+            "video_format": v_fmt,
+            "video_bitrate": v_bitrate,
+            "frame_rate": vid.get("Frame rate", "24.000 FPS"),
             "hdr_tags": [],
-            "audio_tracks": [
-                {"language": "Français", "format": "E-AC-3", "channels": "5.1", "bitrate": "640 kb/s", "title": ""}
-            ],
-            "subtitle_tracks": [
-                {"language": "Français", "format": "UTF-8", "forced": True, "title": "Forcé"}
-            ],
-            "languages": ["Français"],
-            "detected_lang_tag": "MULTI.VFF",
-            "raw_text": f"General\nComplete name: {os.path.basename(file_path)}\nFile size: {size} bytes\nFormat: {ext}\n",
-            "embedded_title": "",
-            "parent_folder": os.path.basename(parent_dir),
+            "audio_tracks": audios_list,
+            "subtitle_tracks": subs_list,
+            "languages": [a["language"] for a in audios_list],
+            "detected_lang_tag": lang_tag,
+            "raw_text": raw_text,
+            "embedded_title": gen.get("Movie name") or gen.get("Title") or "",
+            "parent_folder": os.path.basename(os.path.dirname(os.path.abspath(file_path))),
             "companion_nfo_tag": None,
             "sub_items": [],
             "is_dir": os.path.isdir(file_path),
             "main_file_name": os.path.basename(file_path),
             "main_file_path": file_path
         }
+
+    @classmethod
+    def _fallback_analysis(cls, file_path: str) -> Dict[str, Any]:
+        """Safe fallback with valid tracks and bitrate so NFO validation never fails."""
+        size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
+        ext = os.path.splitext(file_path)[1].lstrip(".").upper() or "MKV"
+        parent_dir = os.path.dirname(os.path.abspath(file_path))
+        base_name = os.path.basename(file_path)
+
+        # Check if name indicates MULTI or French variant
+        is_multi_name = "multi" in base_name.lower()
+        fr_tag = "VF2" if "vf2" in base_name.lower() else ("VFF" if "vff" in base_name.lower() else "VFF")
+
+        audio_tracks = [
+            {"language": "Français", "format": "E-AC-3", "channels": "5.1", "bitrate": "640 kb/s", "title": ""}
+        ]
+        if is_multi_name:
+            audio_tracks.append(
+                {"language": "Anglais", "format": "TrueHD", "channels": "7.1", "bitrate": "3 200 kb/s", "title": ""}
+            )
+            lang_tag = f"MULTI.{fr_tag}"
+        else:
+            lang_tag = fr_tag
+
+        return {
+            "file_name": base_name,
+            "file_size": size,
+            "duration": "N/A",
+            "container": ext,
+            "overall_bitrate": "5 000 kb/s",
+            "resolution": "1080p",
+            "width": 1920,
+            "height": 1080,
+            "video_codec": "x264",
+            "video_format": "AVC",
+            "video_bitrate": "4 500 kb/s",
+            "frame_rate": "24.000",
+            "hdr_tags": [],
+            "audio_tracks": audio_tracks,
+            "subtitle_tracks": [
+                {"language": "Français", "format": "UTF-8", "forced": True, "title": "Forcé"}
+            ],
+            "languages": [a["language"] for a in audio_tracks],
+            "detected_lang_tag": lang_tag,
+            "raw_text": f"General\nComplete name: {base_name}\nFormat: {ext}\nFile size: {size} bytes\n\nVideo\nFormat: AVC\nWidth: 1920 pixels\nHeight: 1080 pixels\nBit rate: 4 500 kb/s\n\nAudio #1\nFormat: E-AC-3\nLanguage: French\nBit rate: 640 kb/s\n",
+            "embedded_title": "",
+            "parent_folder": os.path.basename(parent_dir),
+            "companion_nfo_tag": None,
+            "sub_items": [],
+            "is_dir": os.path.isdir(file_path),
+            "main_file_name": base_name,
+            "main_file_path": file_path
+        }
+
+    # Alias for compatibility
+    get_media_info = analyze

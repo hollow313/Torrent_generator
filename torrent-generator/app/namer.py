@@ -164,7 +164,15 @@ class ReleaseNamer:
         hdr_str = ".".join(hdr_tags) if hdr_tags else ""
 
         # Language tag
-        lang_tag = custom_lang or media_info.get("detected_lang_tag", "MULTI.VFF")
+        lang_tag = custom_lang or media_info.get("detected_lang_tag", "VFF")
+
+        # C411 Strict Rule: MULTI is ONLY permitted if the release contains at least 2 audio tracks!
+        audio_tracks_list = media_info.get("audio_tracks", [])
+        if len(audio_tracks_list) < 2 and lang_tag:
+            if lang_tag.startswith("MULTI."):
+                lang_tag = lang_tag.replace("MULTI.", "")
+            elif lang_tag == "MULTI":
+                lang_tag = "VFF"
 
         # Detect Season / Episode / Tome tokens (e.g. S01E05, S01, E1050, T01, T01-T20)
         se_match = re.search(r"\b(S\d{1,2}E\d{1,4})\b", raw_name, re.IGNORECASE)

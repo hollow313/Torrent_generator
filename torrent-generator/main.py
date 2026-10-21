@@ -364,7 +364,7 @@ async def generate_torrent(req: GenerateRequest):
     actual_source_path = req.source_path
     if os.path.isdir(req.source_path) and req.release_mode == "single":
         # Target the main video file directly so Plex artworks (backdrop.jpg, folder.jpg) are excluded
-        m_info = MediaAnalyzer.get_media_info(req.source_path)
+        m_info = MediaAnalyzer.analyze(req.source_path)
         if m_info.get("main_file_path") and os.path.exists(m_info["main_file_path"]):
             actual_source_path = m_info["main_file_path"]
 
@@ -503,6 +503,28 @@ async def test_c411():
     cfg = get_config()
     tracker = C411Tracker(api_key=cfg.c411_api_key, base_url=cfg.c411_base_url, passkey=cfg.c411_passkey)
     return await tracker.test_connection()
+
+@app.post("/api/test-mediainfo")
+async def test_mediainfo(req: AnalyzeRequest):
+    cmd = MediaAnalyzer.get_mediainfo_cmd()
+    exists = os.path.exists(req.path)
+    res = {
+        "mediainfo_cmd": cmd,
+        "mediainfo_in_path": shutil.which("mediainfo"),
+        "target_path": req.path,
+        "target_exists": exists,
+        "target_readable": os.access(req.path, os.R_OK) if exists else False
+    }
+    if cmd and exists:
+        try:
+            p = subprocess.run([cmd, req.path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=15)
+            res["mediainfo_returncode"] = p.returncode
+            res["mediainfo_stdout_len"] = len(p.stdout)
+            res["mediainfo_stdout_sample"] = p.stdout[:500]
+            res["mediainfo_stderr"] = p.stderr
+        except Exception as e:
+            res["mediainfo_error"] = str(e)
+    return res
 
 @app.post("/api/tmdb-search")
 async def search_tmdb(req: TmdbSearchRequest):

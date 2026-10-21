@@ -1,15 +1,13 @@
-# Lightweight Alpine Linux with Python 3.12
-FROM python:3.12-alpine
+# Debian Bookworm slim with Python 3.12 (Native glibc & robust MediaInfo support)
+FROM python:3.12-slim
 
 # Install system dependencies (mediainfo, curl, bash, timezone data)
-RUN apk add --no-cache \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     mediainfo \
-    bash \
     curl \
+    bash \
     tzdata \
-    gcc \
-    musl-dev \
-    linux-headers
+    && rm -rf /var/lib/apt/lists/*
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
@@ -24,12 +22,11 @@ WORKDIR /app
 # Install Python requirements
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt && \
-    apk del gcc musl-dev linux-headers
+    pip install --no-cache-dir -r requirements.txt
 
-# Create apps user/group (UID 568, GID 568)
-RUN addgroup -g 568 apps && \
-    adduser -u 568 -G apps -s /bin/sh -D apps
+# Create apps user/group (UID 568, GID 568) for TrueNAS SCALE
+RUN groupadd -g 568 apps && \
+    useradd -u 568 -g apps -s /bin/bash -m apps
 
 # Copy application files
 COPY main.py .
