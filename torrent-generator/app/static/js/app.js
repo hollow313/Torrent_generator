@@ -817,57 +817,71 @@ async function searchTmdb() {
     }
 }
 
-function applyTmdbMetadata(item) {
-    document.getElementById("tmdb-id-val").value = item.id;
-    document.getElementById("imdb-id-val").value = item.imdb_id || "";
-    document.getElementById("poster-url-val").value = item.poster_url || "";
+async function applyTmdbMetadata(item) {
+    let fullItem = item;
+    // If rich fields like directors/genres_str are missing, fetch full details from API
+    if (!item.directors && item.id) {
+        try {
+            const mType = item.media_type || "movie";
+            const res = await fetch("/api/tmdb-details", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ tmdb_id: item.id, media_type: mType })
+            });
+            if (res.ok) {
+                fullItem = await res.json();
+            }
+        } catch (e) {
+            console.error("Error fetching full tmdb details:", e);
+        }
+    }
+
+    document.getElementById("tmdb-id-val").value = fullItem.id || "";
+    document.getElementById("imdb-id-val").value = fullItem.imdb_id || "";
+    document.getElementById("poster-url-val").value = fullItem.poster_url || "";
     document.getElementById("tmdb-results-container").style.display = "none";
 
     const badge = document.getElementById("tmdb-status-badge");
-    if (badge) badge.textContent = `Fiche : ${item.title} (${item.year || 'N/A'})`;
+    if (badge) badge.textContent = `Fiche : ${fullItem.title} (${fullItem.year || 'N/A'})`;
 
-    if (item.year && !document.getElementById("input-year").value) {
-        document.getElementById("input-year").value = item.year;
+    if (fullItem.year && !document.getElementById("input-year").value) {
+        document.getElementById("input-year").value = fullItem.year;
         recalculateTitle();
     }
 
-    // Regenerate BBCode description with Poster and French Synopsis
+    // Regenerate C411 presentation description
     if (currentAnalysis) {
         const releaseTitle = document.getElementById("input-release-title").value;
         const source = document.getElementById("select-source").value;
-        const tag = document.getElementById("input-team-tag").value;
-        const nfo = document.getElementById("editor-nfo").value;
+        const tag = document.getElementById("input-team-tag").value.trim() || "NOTAG";
+        const fileCount = currentAnalysis.media_info.sub_items && currentAnalysis.media_info.sub_items.length > 0 
+            ? currentAnalysis.media_info.sub_items.length 
+            : 1;
 
-        // Custom BBCode update
-        let bb = `[center]\n`;
-        if (item.poster_url) {
-            bb += `[img]${item.poster_url}[/img]\n\n`;
-        }
-        bb += `[size=5][b][color=#3498db]${releaseTitle}[/color][/b][/size]\n[hr]\n`;
-        if (item.synopsis) {
-            bb += `[size=4][b][color=#e74c3c]SYNOPSIS[/color][/b][/size]\n[quote]${item.synopsis}[/quote]\n\n`;
-        }
-        bb += `[size=4][b][color=#2ecc71]INFORMATIONS SUR LA RELEASE[/color][/b][/size]\n`;
-        bb += `[b]Format conteneur :[/b] ${currentAnalysis.media_info.container}\n`;
-        bb += `[b]Durée :[/b] ${currentAnalysis.media_info.duration}\n`;
-        bb += `[b]Source :[/b] ${source}\n`;
-        bb += `[b]Signature / Tag :[/b] ${tag}\n\n`;
-
-        bb += `[size=4][b][color=#f39c12]DÉTAILS TECHNIQUES[/color][/b][/size]\n`;
-        bb += `[b]Vidéo :[/b] ${currentAnalysis.media_info.video_codec} (${currentAnalysis.media_info.resolution})\n`;
-        if (currentAnalysis.media_info.audio_tracks) {
-            currentAnalysis.media_info.audio_tracks.forEach((a, i) => {
-                bb += `[b]Audio #${i+1} :[/b] ${a.language} | ${a.format} ${a.channels} ch\n`;
+        try {
+            const genRes = await fetch("/api/generate-description", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    release_title: releaseTitle,
+                    media_info: currentAnalysis.media_info,
+                    source: source,
+                    tag: tag,
+                    tmdb_data: fullItem,
+                    file_count: fileCount
+                })
             });
+            if (genRes.ok) {
+                const genData = await genRes.json();
+                document.getElementById("editor-bbcode").value = genData.description;
+                updateBbcodePreview();
+            }
+        } catch (e) {
+            console.error("Error generating C411 description:", e);
         }
-        bb += `\n[size=4][b][color=#9b59b6]NFO TECHNIQUE[/color][/b][/size]\n`;
-        bb += `[spoiler=Afficher le NFO][font=monospace]${nfo}[/font][/spoiler]\n[hr]\n`;
-        bb += `[i]Release partagée avec Torrent Generator C411[/i]\n[/center]`;
-
-        document.getElementById("editor-bbcode").value = bb;
-        updateBbcodePreview();
-        showToast(`Métadonnées appliquées : "${item.title}" (${item.year})`, "success");
     }
+
+    showToast(`Métadonnées appliquées : "${fullItem.title}" (${fullItem.year || 'N/A'})`, "success");
 }
 
 // ==========================================
@@ -1106,7 +1120,13 @@ function escapeJsString(str) {
 // BBCode Live HTML Preview Generator
 // ==========================================
 function renderBbcodeToHtml(bbcode) {
-    if (!bbcode) return "<div class='text-muted text-center py-6'>Aucune description BBCode à afficher.</div>";
+    if (!bbcode) return "<div class='text-muted text-center py-6'>Aucune description à afficher.</div>";
+
+    // If the content is already HTML (C411 standard HTML presentation)
+    const hasHtmlTags = /<\s*(?:div|table|p|strong|h[1-6]|img|br|span|a|tbody|tr|td|th)\b/i.test(bbcode);
+    if (hasHtmlTags) {
+        return bbcode;
+    }
 
     let html = escapeHtml(bbcode);
 

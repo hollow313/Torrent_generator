@@ -1,7 +1,34 @@
 import os
 import re
+from datetime import datetime
 from typing import Dict, Any, List, Optional, Tuple
 import httpx
+
+def format_french_date(d_str: str) -> str:
+    """Formats 'YYYY-MM-DD' into French long date (e.g. 'lundi 29 novembre 2021')."""
+    if not d_str:
+        return ""
+    try:
+        dt = datetime.strptime(d_str[:10], "%Y-%m-%d")
+        days = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
+        months = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
+        return f"{days[dt.weekday()]} {dt.day} {months[dt.month - 1]} {dt.year}"
+    except Exception:
+        return d_str
+
+def format_duration(minutes: Any) -> str:
+    """Formats runtime minutes into 'XhXXmin' or 'XXmin'."""
+    if not minutes:
+        return ""
+    try:
+        m = int(minutes)
+        h = m // 60
+        mins = m % 60
+        if h > 0:
+            return f"{h}h{mins:02d}min" if mins > 0 else f"{h}h"
+        return f"{mins}min"
+    except Exception:
+        return str(minutes)
 
 class TmdbClient:
     def __init__(self, api_key: str = ""):
@@ -79,7 +106,7 @@ class TmdbClient:
             return []
 
     async def get_details(self, tmdb_id: int, media_type: str = "movie") -> Optional[Dict[str, Any]]:
-        """Fetches full details including external IDs (IMDB ID)."""
+        """Fetches full details including external IDs (IMDb ID) and credits (director, cast)."""
         if not self.api_key:
             return None
 
@@ -87,7 +114,7 @@ class TmdbClient:
         headers, params = self._get_auth()
         params.update({
             "language": "fr-FR",
-            "append_to_response": "external_ids"
+            "append_to_response": "external_ids,credits"
         })
 
         try:
@@ -103,19 +130,64 @@ class TmdbClient:
                 poster_path = data.get("poster_path")
                 poster_url = f"{self.image_base_url}{poster_path}" if poster_path else ""
 
-                release_date = data.get("release_date") or data.get("first_air_date") or ""
-                item_year = release_date.split("-")[0] if release_date else ""
+                release_date_raw = data.get("release_date") or data.get("first_air_date") or ""
+                item_year = release_date_raw.split("-")[0] if release_date_raw else ""
+                release_date_formatted = format_french_date(release_date_raw)
+
+                # Duration / Runtime
+                runtime = data.get("runtime")
+                if not runtime:
+                    ep_runtimes = data.get("episode_run_time") or []
+                    if ep_runtimes:
+                        runtime = ep_runtimes[0]
+                    else:
+                        runtime = (data.get("last_episode_to_air") or {}).get("runtime")
+                duration_str = format_duration(runtime) if runtime else ""
+
+                # Production country
+                countries = [c.get("name") for c in data.get("production_countries", []) if c.get("name")]
+                if not countries and data.get("origin_country"):
+                    countries = data.get("origin_country")
+                country_str = ", ".join(countries) if countries else "France"
+
+                # Genres
+                genres_list = [g.get("name") for g in data.get("genres", []) if g.get("name")]
+                genres_str = ", ".join(genres_list) if genres_list else "Non renseigné"
+
+                # Credits (Directors & Cast)
+                credits_data = data.get("credits", {})
+                crew = credits_data.get("crew", [])
+                directors = [m.get("name") for m in crew if m.get("job") in ["Director", "Réalisateur"]]
+                if not directors:
+                    directors = [c.get("name") for c in data.get("created_by", []) if c.get("name")]
+                directors_str = ", ".join(directors) if directors else "Non renseigné"
+
+                cast_list = [c.get("name") for c in credits_data.get("cast", [])[:6] if c.get("name")]
+                cast_str = ", ".join(cast_list) if cast_list else "Non renseigné"
+
+                vote_avg = round(float(data.get("vote_average", 0) or 0), 1)
+
+                imdb_url = f"https://www.imdb.com/title/{imdb_id}/" if imdb_id else ""
 
                 return {
                     "id": data.get("id"),
                     "imdb_id": imdb_id,
+                    "imdb_url": imdb_url,
                     "media_type": media_type,
                     "title": data.get("title") or data.get("name") or "",
                     "original_title": data.get("original_title") or data.get("original_name") or "",
                     "year": item_year,
                     "synopsis": data.get("overview", ""),
                     "poster_url": poster_url,
-                    "genres": [g["name"] for g in data.get("genres", [])]
+                    "genres": genres_list,
+                    "genres_str": genres_str,
+                    "country": country_str,
+                    "release_date": release_date_raw,
+                    "release_date_formatted": release_date_formatted,
+                    "duration": duration_str,
+                    "directors": directors_str,
+                    "cast": cast_str,
+                    "vote_average": vote_avg
                 }
         except Exception as e:
             print(f"[TMDB] Get details error: {e}")

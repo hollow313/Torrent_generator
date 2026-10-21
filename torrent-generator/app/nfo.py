@@ -1,3 +1,5 @@
+import os
+import re
 from typing import Dict, Any, List
 
 C411_ASCII_HEADER = r"""
@@ -11,6 +13,24 @@ C411_ASCII_HEADER = r"""
                  COMMUNITY 411 - RELEASE NFO
   ═══════════════════════════════════════════════════════════
 """
+
+def sanitize_mediainfo_text(raw_text: str, file_name: str) -> str:
+    """Ensures no NAS / host directories leak into the NFO output."""
+    if not raw_text:
+        return ""
+    base = os.path.basename(file_name) if file_name else ""
+    lines = []
+    for line in raw_text.splitlines():
+        if re.match(r"^\s*(?:Complete\s*name|Nom\s*complet|CompleteName)\s*:", line, re.IGNORECASE):
+            prefix = line.split(":", 1)[0]
+            val = line.split(":", 1)[1].strip()
+            name = base or os.path.basename(val)
+            lines.append(f"{prefix}: {name}")
+        elif re.match(r"^\s*(?:Folder\s*name|Nom\s*du\s*dossier|Directory)\s*:", line, re.IGNORECASE):
+            continue
+        else:
+            lines.append(line)
+    return "\n".join(lines)
 
 class NfoGenerator:
     @classmethod
@@ -87,17 +107,14 @@ class NfoGenerator:
             lines.append("  Aucun sous-titre présent")
         lines.append("")
 
-        # Raw MediaInfo
+        # Raw MediaInfo (Sanitized: only filename, no container/NAS paths)
         raw_text = media_info.get("raw_text", "")
         if raw_text:
+            sanitized_raw = sanitize_mediainfo_text(raw_text, media_info.get("file_name", ""))
             lines.append("═══════════════════════════════════════════════════════════")
             lines.append("                MEDIAINFO COMPLET")
             lines.append("═══════════════════════════════════════════════════════════")
-            lines.append(raw_text.strip())
+            lines.append(sanitized_raw.strip())
             lines.append("")
-
-        lines.append("───────────────────────────────────────────────────────────")
-        lines.append("  Généré automatiquement par Torrent Generator C411")
-        lines.append("───────────────────────────────────────────────────────────")
 
         return "\n".join(lines)

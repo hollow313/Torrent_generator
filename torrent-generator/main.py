@@ -132,6 +132,19 @@ class TmdbSearchRequest(BaseModel):
     year: Optional[str] = None
     media_type: str = "movie"
 
+class TmdbDetailsRequest(BaseModel):
+    tmdb_id: int
+    media_type: str = "movie"
+
+class GenerateDescriptionRequest(BaseModel):
+    release_title: str
+    media_info: Dict[str, Any]
+    source: str = "WEB"
+    vod_platform: Optional[str] = ""
+    tag: str = "NOTAG"
+    tmdb_data: Optional[Dict[str, Any]] = None
+    file_count: Optional[int] = 1
+
 class MassScanRequest(BaseModel):
     folder_path: str
     scan_mode: Optional[str] = "auto"  # auto, films, series_season, series_episode, mangas
@@ -504,6 +517,28 @@ async def search_tmdb(req: TmdbSearchRequest):
     # 2. Regular text search
     results = await client.search(query=req.query, year=req.year, media_type=req.media_type)
     return {"results": results, "direct_match": False}
+
+@app.post("/api/tmdb-details")
+async def get_tmdb_details(req: TmdbDetailsRequest):
+    cfg = get_config()
+    client = TmdbClient(api_key=cfg.tmdb_api_key)
+    details = await client.get_details(req.tmdb_id, req.media_type)
+    if not details:
+        raise HTTPException(status_code=404, detail="Détails TMDB introuvables.")
+    return details
+
+@app.post("/api/generate-description")
+async def generate_description_endpoint(req: GenerateDescriptionRequest):
+    desc = BBCodeGenerator.generate(
+        release_title=req.release_title,
+        media_info=req.media_info,
+        source=req.source,
+        vod_platform=req.vod_platform or "",
+        tag=req.tag,
+        tmdb_data=req.tmdb_data,
+        file_count=req.file_count or 1
+    )
+    return {"description": desc}
 
 @app.post("/api/mass-scan")
 async def mass_scan(req: MassScanRequest):

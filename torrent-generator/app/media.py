@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import shutil
 import subprocess
@@ -8,6 +9,28 @@ class MediaAnalyzer:
     @staticmethod
     def is_mediainfo_available() -> bool:
         return shutil.which("mediainfo") is not None
+
+    @classmethod
+    def sanitize_mediainfo_text(cls, raw_text: str, file_path_or_name: str) -> str:
+        """
+        Sanitizes MediaInfo dump: strips internal NAS / server folder paths.
+        Leaves only the filename in 'Complete name', and removes directory lines.
+        """
+        if not raw_text:
+            return ""
+        base_name = os.path.basename(file_path_or_name)
+        sanitized_lines = []
+        for line in raw_text.splitlines():
+            # Replace Complete name / Nom complet / CompleteName
+            if re.match(r"^\s*(?:Complete\s*name|Nom\s*complet|CompleteName)\s*:", line, re.IGNORECASE):
+                prefix = line.split(":", 1)[0]
+                sanitized_lines.append(f"{prefix}: {base_name}")
+            # Strip folder/directory paths
+            elif re.match(r"^\s*(?:Folder\s*name|Nom\s*du\s*dossier|Directory)\s*:", line, re.IGNORECASE):
+                continue
+            else:
+                sanitized_lines.append(line)
+        return "\n".join(sanitized_lines)
 
     @classmethod
     def analyze(cls, file_path: str) -> Dict[str, Any]:
@@ -60,8 +83,9 @@ class MediaAnalyzer:
                 timeout=60
             )
             raw_text = text_proc.stdout if text_proc.returncode == 0 else ""
+            sanitized_raw_text = cls.sanitize_mediainfo_text(raw_text, target_file)
 
-            return cls._parse_mediainfo_json(data, raw_text, target_file)
+            return cls._parse_mediainfo_json(data, sanitized_raw_text, target_file)
 
         except Exception as e:
             print(f"[MediaAnalyzer] Error running MediaInfo: {e}")
@@ -340,7 +364,7 @@ class MediaAnalyzer:
             ],
             "languages": ["Français"],
             "detected_lang_tag": "MULTI.VFF",
-            "raw_text": f"General\nComplete name: {file_path}\nFile size: {size} bytes\nFormat: {ext}\n",
+            "raw_text": f"General\nComplete name: {os.path.basename(file_path)}\nFile size: {size} bytes\nFormat: {ext}\n",
             "embedded_title": "",
             "parent_folder": os.path.basename(parent_dir),
             "companion_nfo_tag": None,

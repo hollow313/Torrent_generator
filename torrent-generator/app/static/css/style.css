@@ -787,3 +787,63 @@ body {
     max-width: 90%;
 }
 
+/* Styling for C411 presentation layout inside preview */
+.bbcode-preview-box h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+    color: #f8fafc;
+    text-align: center;
+}
+
+.bbcode-preview-box h2#year {
+    font-size: 1.15rem;
+    font-weight: 400;
+    color: #94a3b8;
+    margin-top: 0;
+    text-align: center;
+}
+
+.bbcode-preview-box .my-2 {
+    margin: 1rem 0;
+    text-align: center;
+}
+
+.bbcode-preview-box img {
+    max-width: 100%;
+    height: auto;
+}
+
+.bbcode-preview-box table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    font-size: 0.88rem;
+}
+
+.bbcode-preview-box th {
+    border: 1px solid #047857;
+    background: rgba(6, 78, 59, 0.45);
+    color: #a7f3d0;
+    padding: 8px 12px;
+    font-weight: 600;
+    text-align: left;
+}
+
+.bbcode-preview-box td {
+    border: 1px solid rgba(4, 120, 87, 0.35);
+    background: rgba(15, 23, 42, 0.4);
+    padding: 8px 12px;
+    color: #e2e8f0;
+}
+
+.bbcode-preview-box a {
+    color: #10b981;
+    text-decoration: underline;
+}
+
+.bbcode-preview-box a:hover {
+    color: #34d399;
+}
+
+
