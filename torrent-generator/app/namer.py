@@ -120,39 +120,68 @@ class ReleaseNamer:
         # Source
         source = custom_source or None
         if not source:
-            for s in cls.SOURCES:
-                if re.search(rf"\b{re.escape(s)}\b", raw_name, re.IGNORECASE):
-                    source = s
-                    break
+            if re.search(r"\bWEB[\.\-]?DL\b", raw_name, re.IGNORECASE):
+                source = "WEB-DL"
+            elif re.search(r"\bWEB[\.\-]?Rip\b", raw_name, re.IGNORECASE):
+                source = "WEBRip"
+            elif re.search(r"\b(Blu[\.\-]?Ray|BDRip|BRRip)\b", raw_name, re.IGNORECASE):
+                source = "BluRay"
+            elif re.search(r"\bREMUX\b", raw_name, re.IGNORECASE):
+                source = "REMUX"
+            elif re.search(r"\bHDTV\b", raw_name, re.IGNORECASE):
+                source = "HDTV"
+            elif re.search(r"\bDVD(?:Rip)?\b", raw_name, re.IGNORECASE):
+                source = "DVDRip"
+            else:
+                for s in cls.SOURCES:
+                    if re.search(rf"\b{re.escape(s)}\b", raw_name, re.IGNORECASE):
+                        source = s
+                        break
         if not source and media_info.get("main_file_name"):
-            for s in cls.SOURCES:
-                if re.search(rf"\b{re.escape(s)}\b", media_info["main_file_name"], re.IGNORECASE):
-                    source = s
-                    break
+            m_fn = media_info["main_file_name"]
+            if re.search(r"\bWEB[\.\-]?DL\b", m_fn, re.IGNORECASE):
+                source = "WEB-DL"
+            elif re.search(r"\bWEB[\.\-]?Rip\b", m_fn, re.IGNORECASE):
+                source = "WEBRip"
+            elif re.search(r"\b(Blu[\.\-]?Ray|BDRip|BRRip)\b", m_fn, re.IGNORECASE):
+                source = "BluRay"
+            else:
+                for s in cls.SOURCES:
+                    if re.search(rf"\b{re.escape(s)}\b", m_fn, re.IGNORECASE):
+                        source = s
+                        break
         if not source:
             source = "WEB"
 
         # Video codec
         video_codec = media_info.get("video_codec", "x264")
 
-        # Audio spec (e.g. EAC3.5.1, AC3.5.1, AAC.2.0, DTS.5.1)
+        # Audio spec (e.g. EAC3.5.1, AC3.5.1, AAC.2.0, DTS.5.1, TrueHD.7.1)
         audio_spec = "AAC.2.0"
         audio_tracks = media_info.get("audio_tracks", [])
         if audio_tracks:
             first_audio = audio_tracks[0]
-            fmt = first_audio.get("format", "AAC").upper()
-            if "E-AC-3" in fmt or "EAC3" in fmt:
+            fmt = (first_audio.get("format") or "AAC").upper()
+            if any(k in fmt for k in ["DOLBY DIGITAL PLUS", "E-AC-3", "EAC3", "DD+", "A_EAC3"]):
                 fmt_tag = "EAC3"
-            elif "AC-3" in fmt or "AC3" in fmt:
+            elif any(k in fmt for k in ["DOLBY DIGITAL", "AC-3", "AC3", "DD", "A_AC3"]):
                 fmt_tag = "AC3"
-            elif "DTS-HD" in fmt:
+            elif any(k in fmt for k in ["TRUEHD", "DOLBY TRUEHD"]):
+                fmt_tag = "TrueHD"
+            elif any(k in fmt for k in ["DTS-HD", "DTS HD", "DTS-HD MA"]):
                 fmt_tag = "DTS.HD.MA"
+            elif any(k in fmt for k in ["DTS-HD HRA"]):
+                fmt_tag = "DTS.HD.HRA"
+            elif any(k in fmt for k in ["DTS:X", "DTS-X"]):
+                fmt_tag = "DTS.X"
             elif "DTS" in fmt:
                 fmt_tag = "DTS"
-            elif "TRUEHD" in fmt:
-                fmt_tag = "TrueHD"
             elif "FLAC" in fmt:
                 fmt_tag = "FLAC"
+            elif "OPUS" in fmt:
+                fmt_tag = "Opus"
+            elif "MP3" in fmt:
+                fmt_tag = "MP3"
             else:
                 fmt_tag = "AAC"
             
@@ -190,13 +219,16 @@ class ReleaseNamer:
         title_clean = base_name
         # Remove SxxExx, Sxx, Exx, Txx, INTEGRALE from title base
         title_clean = re.sub(r"\b(S\d{1,2}E\d{1,4}|S\d{1,2}|E\d{1,4}|Ep\d{1,4}|Episode[\s\.]*\d+|T\d{1,3}|Tome[\s\.]*\d+|INTEGRALE)\b", "", title_clean, flags=re.IGNORECASE)
-        # Remove (19xx|20xx) or [19xx|20xx]
-        title_clean = re.sub(r"[\(\[\{]\s*(?:19\d\d|20\d\d)\s*[\)\]\}]", "", title_clean)
-        if year:
-            title_clean = title_clean.split(year)[0]
+        
+        # If year is in title base, cleanly isolate the movie/series title before the year
+        if year and re.search(rf"\b{re.escape(year)}\b", title_clean):
+            title_clean = re.split(rf"[\(\[\{{]?\s*{re.escape(year)}\b", title_clean)[0]
+        
+        # Remove leftover bracket/parenthesis delimiters
+        title_clean = re.sub(r"[\(\[\{\)\]\}]+", " ", title_clean)
 
         # Strip common trailing tags/qualities from title_clean
-        title_clean = re.sub(r"\b(2160p|1080p|720p|576p|480p|BluRay|BDRip|BRRip|WEB-DL|WEBRip|WEB|HDTV|DVDRip|REMUX|x264|x265|HEVC|AVC|AAC|AC3|DTS|MULTI|VFF|VF2|VFQ|VFI|VOSTFR|TRUEFRENCH|FRENCH)\b.*$", "", title_clean, flags=re.IGNORECASE)
+        title_clean = re.sub(r"\b(2160p|1080p|720p|576p|480p|BluRay|BDRip|BRRip|WEB-DL|WEBDL|WEBRip|WEB|HDTV|DVDRip|REMUX|x264|x265|HEVC|AVC|AAC|AC3|EAC3|DTS|MULTI|VFF|VF2|VFQ|VFI|VOSTFR|TRUEFRENCH|FRENCH)\b.*$", "", title_clean, flags=re.IGNORECASE)
 
         title_part = cls.clean_title(title_clean)
         if not title_part:

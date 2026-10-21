@@ -265,6 +265,7 @@ async function selectAndAnalyze(filePath, forcedMode = null) {
         document.getElementById("input-lang-tag").value = namer.language || "";
         document.getElementById("select-source").value = namer.source || "WEB";
         document.getElementById("input-team-tag").value = namer.final_tag || "NOTAG";
+        checkCoherenceWarning();
 
         const badgeTag = document.getElementById("badge-tag-status");
         if (namer.detected_tag) {
@@ -364,24 +365,78 @@ function updateModeBadge(mode) {
     if (badge) badge.textContent = labels[mode] || (mode ? mode.toUpperCase() : "MÉDIA");
 }
 
+function checkCoherenceWarning() {
+    if (!currentAnalysis || !currentAnalysis.media_info) return;
+    const titleInput = document.getElementById("input-release-title");
+    const title = (titleInput ? titleInput.value : "").trim();
+    const audioTracks = currentAnalysis.media_info.audio_tracks || [];
+    const audioCount = audioTracks.length;
+    const alertBox = document.getElementById("alert-coherence-warning");
+    const textExpl = document.getElementById("text-coherence-explanation");
+    const btnFix = document.getElementById("btn-fix-coherence");
+
+    if (!alertBox) return;
+
+    const hasMultiInTitle = /\bMULTI\b/i.test(title);
+
+    if (hasMultiInTitle && audioCount < 2) {
+        alertBox.style.display = "block";
+        const trackLang = audioTracks[0] ? (audioTracks[0].language || "Français") : "Français";
+        if (textExpl) {
+            textExpl.innerHTML = `<strong>⚠️ Attention Règle C411 (Incohérence NFO) :</strong> Le titre contient <code>MULTI</code> mais le média ne déclare qu'une seule piste audio (${trackLang}). Le bot C411 bloque l'envoi dans ce cas. Le tag doit être <code>VFF</code> ou <code>TRUEFRENCH</code>.`;
+        }
+        if (btnFix) {
+            btnFix.onclick = () => {
+                let currentVal = titleInput.value;
+                let fixed = currentVal.replace(/\.MULTI\./gi, ".").replace(/\.MULTI\b/gi, "").replace(/\bMULTI\./gi, "");
+                titleInput.value = fixed;
+                let langInput = document.getElementById("input-lang-tag");
+                if (langInput) {
+                    langInput.value = langInput.value.replace(/^MULTI\./i, "").replace(/^MULTI$/i, "VFF");
+                }
+                checkCoherenceWarning();
+                if (typeof checkDuplicatesC411 === "function") checkDuplicatesC411(fixed);
+                showToast("Titre corrigé selon les normes C411 (tag MULTI retiré) !", "success");
+            };
+        }
+    } else {
+        alertBox.style.display = "none";
+    }
+}
+
 function recalculateTitle() {
     if (!currentAnalysis) return;
     const mode = document.getElementById("select-release-mode").value;
     const year = document.getElementById("input-year").value.trim();
-    const lang = document.getElementById("input-lang-tag").value.trim();
+    let lang = document.getElementById("input-lang-tag").value.trim();
     const source = document.getElementById("select-source").value;
     const tag = document.getElementById("input-team-tag").value.trim() || "NOTAG";
+
+    // C411 Strict Rule: If < 2 audio tracks, MULTI is strictly forbidden
+    const audioTracks = (currentAnalysis.media_info && currentAnalysis.media_info.audio_tracks) ? currentAnalysis.media_info.audio_tracks : [];
+    if (audioTracks.length < 2 && lang) {
+        if (/^MULTI\./i.test(lang)) {
+            lang = lang.replace(/^MULTI\./i, "");
+            document.getElementById("input-lang-tag").value = lang;
+        } else if (/^MULTI$/i.test(lang)) {
+            lang = "VFF";
+            document.getElementById("input-lang-tag").value = lang;
+        }
+    }
 
     let raw = currentAnalysis.media_info.file_name;
     // Strip file extension
     raw = raw.replace(/\.[a-zA-Z0-9]+$/, "");
 
-    // Clean title base (strip existing tokens, years, qualities)
-    let titlePart = raw
-        .replace(/[\(\[\{]\s*(?:19\d\d|20\d\d)\s*[\)\]\}].*$/, "")
-        .replace(/\b(19\d\d|20\d\d)\b.*$/, "")
+    // Clean title base: isolate movie/series title before year
+    let titlePart = raw;
+    if (year && raw.includes(year)) {
+        titlePart = raw.split(new RegExp(`[\\(\\[\\{]?\\s*${year}\\b`, 'i'))[0];
+    }
+    titlePart = titlePart
+        .replace(/[\(\[\{].*?[\)\]\}]/g, "")
         .replace(/\b(S\d{1,2}E\d{1,4}|S\d{1,2}|E\d{1,4}|Ep\d{1,4}|Episode[\s\.]*\d+|T\d{1,3}|Tome[\s\.]*\d+|INTEGRALE)\b/gi, "")
-        .replace(/\b(2160p|1080p|720p|576p|480p|BluRay|BDRip|BRRip|WEB-DL|WEBRip|WEB|HDTV|DVDRip|REMUX|x264|x265|HEVC|AVC|AAC|AC3|DTS|MULTI|VFF|VF2|VFQ|VFI|VOSTFR|TRUEFRENCH|FRENCH)\b.*$/gi, "")
+        .replace(/\b(2160p|1080p|720p|576p|480p|BluRay|BDRip|BRRip|WEB-DL|WEBDL|WEBRip|WEB|HDTV|DVDRip|REMUX|x264|x265|HEVC|AVC|AAC|AC3|EAC3|DTS|MULTI|VFF|VF2|VFQ|VFI|VOSTFR|TRUEFRENCH|FRENCH)\b.*$/gi, "")
         .replace(/[\s_\-]+/g, ".")
         .replace(/[^\w\.]/g, "")
         .replace(/\.+/g, ".")
@@ -437,6 +492,9 @@ function recalculateTitle() {
     const newTitle = parts.join(".") + `-${tag}`;
     document.getElementById("input-release-title").value = newTitle;
     
+    // Check coherence warning immediately
+    checkCoherenceWarning();
+
     // Automatically re-run duplicate check on title change
     checkDuplicatesC411(newTitle);
 }
@@ -447,6 +505,10 @@ function initGenerator() {
         recalculateTitle();
         showToast("Titre réactualisé !", "info");
     });
+
+    // Real-time C411 title and language coherence checks
+    document.getElementById("input-release-title").addEventListener("input", checkCoherenceWarning);
+    document.getElementById("input-lang-tag").addEventListener("input", checkCoherenceWarning);
 
     // Dynamic Mode Selector change (automatically updates title and category)
     document.getElementById("select-release-mode").addEventListener("change", (e) => {
@@ -507,6 +569,13 @@ function initGenerator() {
         const releaseName = document.getElementById("input-release-title").value.trim();
         if (!releaseName) {
             showToast("Veuillez renseigner un nom de release.", "error");
+            return;
+        }
+
+        const audioTracks = (currentAnalysis && currentAnalysis.media_info && currentAnalysis.media_info.audio_tracks) ? currentAnalysis.media_info.audio_tracks : [];
+        if (/\bMULTI\b/i.test(releaseName) && audioTracks.length < 2) {
+            checkCoherenceWarning();
+            showToast("Incohérence C411 : Le titre contient MULTI mais le média ne contient qu'une seule piste audio. C411 rejettera l'envoi !", "error");
             return;
         }
 
@@ -573,6 +642,13 @@ function initGenerator() {
     document.getElementById("btn-upload-c411").addEventListener("click", async () => {
         if (!currentGeneratedData) return;
 
+        const audioTracks = (currentAnalysis && currentAnalysis.media_info && currentAnalysis.media_info.audio_tracks) ? currentAnalysis.media_info.audio_tracks : [];
+        if (/\bMULTI\b/i.test(currentGeneratedData.release_name) && audioTracks.length < 2) {
+            checkCoherenceWarning();
+            showToast("Incohérence C411 : Le titre contient MULTI mais le média ne contient qu'une seule piste audio. C411 rejettera l'upload !", "error");
+            return;
+        }
+
         const btnUpload = document.getElementById("btn-upload-c411");
         btnUpload.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-2"></i> Upload vers C411...`;
         btnUpload.disabled = true;
@@ -602,6 +678,9 @@ function initGenerator() {
             } else {
                 showToast(result.message, "error");
                 if (result.web_upload_url) {
+                    if (audioTracks.length < 2) {
+                        showToast("💡 Sur la page C411 : Sélectionnez Langue = 'Français' (ne cochez pas Multi car 1 seule piste audio)", "info");
+                    }
                     window.open(result.web_upload_url, "_blank");
                 }
             }
