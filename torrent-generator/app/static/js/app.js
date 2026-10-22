@@ -267,6 +267,34 @@ async function selectAndAnalyze(filePath, forcedMode = null) {
         document.getElementById("input-team-tag").value = namer.final_tag || "NOTAG";
         checkCoherenceWarning();
 
+        // Populate Light Marker selector
+        const lightSelect = document.getElementById("select-light-marker");
+        if (lightSelect) {
+            if (namer.light_tag) {
+                lightSelect.value = namer.light_tag;
+            } else {
+                lightSelect.value = "auto";
+            }
+        }
+
+        // Handle French TMDB title sync alert
+        const alertTmdb = document.getElementById("alert-tmdb-fr-title");
+        const textTmdb = document.getElementById("text-tmdb-fr-title");
+        if (data.tmdb_data && data.tmdb_data.title) {
+            currentAnalysis.custom_title = data.tmdb_data.title;
+            if (alertTmdb && textTmdb) {
+                textTmdb.textContent = `${data.tmdb_data.title} (${data.tmdb_data.year || ''})`;
+                alertTmdb.style.display = "block";
+            }
+            const tmdbBadge = document.getElementById("tmdb-status-badge");
+            if (tmdbBadge) tmdbBadge.textContent = `Fiche : ${data.tmdb_data.title} (${data.tmdb_data.year || 'N/A'})`;
+            document.getElementById("tmdb-id-val").value = data.tmdb_data.id || "";
+            document.getElementById("imdb-id-val").value = data.tmdb_data.imdb_id || "";
+            document.getElementById("poster-url-val").value = data.tmdb_data.poster_url || "";
+        } else {
+            if (alertTmdb) alertTmdb.style.display = "none";
+        }
+
         const badgeTag = document.getElementById("badge-tag-status");
         if (namer.detected_tag) {
             badgeTag.textContent = `TAG D'ORIGINE : -${namer.detected_tag}`;
@@ -404,13 +432,33 @@ function checkCoherenceWarning() {
     }
 }
 
-function recalculateTitle() {
+function cleanTitleJs(text) {
+    if (!text) return "";
+    let s = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    s = s.replace(/[\s_:\-]+/g, ".");
+    s = s.replace(/[^\w\.]/g, "");
+    s = s.replace(/\.+/g, ".").replace(/^\.+|\.+$/g, "");
+    const words = s.split(".").filter(Boolean).map(w => {
+        if (/^(?:[IVXLCDM]+|[A-Z]{2,4}|\d+[a-zA-Z]?)$/i.test(w) && w.length <= 4) {
+            return w.toUpperCase();
+        }
+        return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+    });
+    return words.join(".");
+}
+
+function recalculateTitle(overrideTitle) {
     if (!currentAnalysis) return;
+    if (overrideTitle) {
+        currentAnalysis.custom_title = overrideTitle;
+    }
     const mode = document.getElementById("select-release-mode").value;
     const year = document.getElementById("input-year").value.trim();
     let lang = document.getElementById("input-lang-tag").value.trim();
     const source = document.getElementById("select-source").value;
     const tag = document.getElementById("input-team-tag").value.trim() || "NOTAG";
+    const lightSelectElem = document.getElementById("select-light-marker");
+    const lightSelect = lightSelectElem ? lightSelectElem.value : "auto";
 
     // C411 Strict Rule: If < 2 audio tracks, MULTI is strictly forbidden
     const audioTracks = (currentAnalysis.media_info && currentAnalysis.media_info.audio_tracks) ? currentAnalysis.media_info.audio_tracks : [];
@@ -424,27 +472,30 @@ function recalculateTitle() {
         }
     }
 
-    let raw = currentAnalysis.media_info.file_name;
-    // Strip file extension
-    raw = raw.replace(/\.[a-zA-Z0-9]+$/, "");
+    let titlePart = "";
+    if (currentAnalysis.custom_title) {
+        titlePart = cleanTitleJs(currentAnalysis.custom_title);
+    } else {
+        let raw = (currentAnalysis.media_info && currentAnalysis.media_info.file_name) ? currentAnalysis.media_info.file_name : "";
+        raw = raw.replace(/\.[a-zA-Z0-9]+$/, "");
 
-    // Clean title base: isolate movie/series title before year
-    let titlePart = raw;
-    if (year && raw.includes(year)) {
-        titlePart = raw.split(new RegExp(`[\\(\\[\\{]?\\s*${year}\\b`, 'i'))[0];
+        let part = raw;
+        if (year && raw.includes(year)) {
+            part = raw.split(new RegExp(`[\\(\\[\\{]?\\s*${year}\\b`, 'i'))[0];
+        }
+        part = part
+            .replace(/[\(\[\{].*?[\)\]\}]/g, "")
+            .replace(/\b(S\d{1,2}E\d{1,4}|S\d{1,2}|E\d{1,4}|Ep\d{1,4}|Episode[\s\.]*\d+|T\d{1,3}|Tome[\s\.]*\d+|INTEGRALE)\b/gi, "")
+            .replace(/\b(2160p|1080p|720p|576p|480p|BluRay|BDRip|BRRip|WEB-DL|WEBDL|WEBRip|WEB|HDTV|DVDRip|REMUX|x264|x265|HEVC|AVC|AAC|AC3|EAC3|DTS|MULTI|VFF|VF2|VFQ|VFI|VOSTFR|TRUEFRENCH|FRENCH)\b.*$/gi, "");
+        titlePart = cleanTitleJs(part);
     }
-    titlePart = titlePart
-        .replace(/[\(\[\{].*?[\)\]\}]/g, "")
-        .replace(/\b(S\d{1,2}E\d{1,4}|S\d{1,2}|E\d{1,4}|Ep\d{1,4}|Episode[\s\.]*\d+|T\d{1,3}|Tome[\s\.]*\d+|INTEGRALE)\b/gi, "")
-        .replace(/\b(2160p|1080p|720p|576p|480p|BluRay|BDRip|BRRip|WEB-DL|WEBDL|WEBRip|WEB|HDTV|DVDRip|REMUX|x264|x265|HEVC|AVC|AAC|AC3|EAC3|DTS|MULTI|VFF|VF2|VFQ|VFI|VOSTFR|TRUEFRENCH|FRENCH)\b.*$/gi, "")
-        .replace(/[\s_\-]+/g, ".")
-        .replace(/[^\w\.]/g, "")
-        .replace(/\.+/g, ".")
-        .trim(".");
 
     if (!titlePart) titlePart = "Release";
 
     const parts = [titlePart];
+
+    let raw = (currentAnalysis.media_info && currentAnalysis.media_info.file_name) ? currentAnalysis.media_info.file_name : "";
+    raw = raw.replace(/\.[a-zA-Z0-9]+$/, "");
 
     // Detect existing tokens from raw filename
     const seMatch = raw.match(/\b(S\d{1,2}E\d{1,4})\b/i);
@@ -477,16 +528,45 @@ function recalculateTitle() {
         if (year) parts.push(year);
     }
 
+    // Determine Light marker according to C411 rules
+    let lightMarker = "";
+    if (lightSelect === "auto") {
+        if (currentAnalysis.namer && currentAnalysis.namer.light_tag) {
+            lightMarker = currentAnalysis.namer.light_tag;
+        } else if (currentAnalysis.media_info) {
+            const vBitrate = currentAnalysis.media_info.video_bitrate_kbps || 0;
+            const res = (currentAnalysis.media_info.resolution || "").toLowerCase();
+            const vCodec = (currentAnalysis.media_info.video_codec || "").toLowerCase();
+            const isBluray = /bluray|bdrip|brrip/i.test(source);
+            if (isBluray && vBitrate > 0) {
+                if (/2160p|4k/.test(res)) {
+                    if (vBitrate < 18000) lightMarker = "4KLight";
+                } else if (/1080p/.test(res)) {
+                    if (vCodec.includes("265") || vCodec.includes("hevc")) {
+                        if (vBitrate < 5000) lightMarker = "HDLight";
+                    } else {
+                        if (vBitrate < 8000) lightMarker = "HDLight";
+                    }
+                } else if (/720p/.test(res)) {
+                    if (vBitrate < 4000) lightMarker = "HDLight";
+                }
+            }
+        }
+    } else if (lightSelect !== "none") {
+        lightMarker = lightSelect;
+    }
+
     const isBook = (mode === "manga_tome" || mode === "manga_pack");
     if (isBook) {
         if (lang) parts.push(lang);
     } else {
         if (lang) parts.push(lang);
-        if (currentAnalysis.media_info.resolution && currentAnalysis.media_info.resolution !== "Autre") parts.push(currentAnalysis.media_info.resolution);
+        if (currentAnalysis.media_info && currentAnalysis.media_info.resolution && currentAnalysis.media_info.resolution !== "Autre") parts.push(currentAnalysis.media_info.resolution);
         if (source) parts.push(source);
-        if (currentAnalysis.media_info.hdr_tags && currentAnalysis.media_info.hdr_tags.length > 0) parts.push(currentAnalysis.media_info.hdr_tags.join("."));
+        if (lightMarker) parts.push(lightMarker);
+        if (currentAnalysis.media_info && currentAnalysis.media_info.hdr_tags && currentAnalysis.media_info.hdr_tags.length > 0) parts.push(currentAnalysis.media_info.hdr_tags.join("."));
         if (currentAnalysis.namer && currentAnalysis.namer.audio_spec) parts.push(currentAnalysis.namer.audio_spec);
-        if (currentAnalysis.media_info.video_codec) parts.push(currentAnalysis.media_info.video_codec);
+        if (currentAnalysis.media_info && currentAnalysis.media_info.video_codec) parts.push(currentAnalysis.media_info.video_codec);
     }
 
     const newTitle = parts.join(".") + `-${tag}`;
@@ -562,6 +642,27 @@ function initGenerator() {
 
     // TMDB Search
     document.getElementById("btn-search-tmdb").addEventListener("click", searchTmdb);
+
+    // Light marker and Source changes
+    const selectLight = document.getElementById("select-light-marker");
+    if (selectLight) {
+        selectLight.addEventListener("change", () => recalculateTitle());
+    }
+    const selectSource = document.getElementById("select-source");
+    if (selectSource) {
+        selectSource.addEventListener("change", () => recalculateTitle());
+    }
+
+    // Apply French TMDB title button
+    const btnApplyTmdb = document.getElementById("btn-apply-tmdb-title");
+    if (btnApplyTmdb) {
+        btnApplyTmdb.addEventListener("click", () => {
+            if (currentAnalysis && currentAnalysis.custom_title) {
+                recalculateTitle();
+                showToast(`Titre Français TMDB appliqué : ${currentAnalysis.custom_title}`, "success");
+            }
+        });
+    }
 
     // 1. Generate Torrent & NFO
     document.getElementById("btn-generate-torrent").addEventListener("click", async () => {
@@ -923,10 +1024,21 @@ async function applyTmdbMetadata(item) {
     const badge = document.getElementById("tmdb-status-badge");
     if (badge) badge.textContent = `Fiche : ${fullItem.title} (${fullItem.year || 'N/A'})`;
 
+    // Display French TMDB title sync alert and update release name
+    if (fullItem.title && currentAnalysis) {
+        currentAnalysis.custom_title = fullItem.title;
+        const alertTmdb = document.getElementById("alert-tmdb-fr-title");
+        const textTmdb = document.getElementById("text-tmdb-fr-title");
+        if (alertTmdb && textTmdb) {
+            textTmdb.textContent = `${fullItem.title} (${fullItem.year || ''})`;
+            alertTmdb.style.display = "block";
+        }
+    }
+
     if (fullItem.year && !document.getElementById("input-year").value) {
         document.getElementById("input-year").value = fullItem.year;
-        recalculateTitle();
     }
+    recalculateTitle();
 
     // Regenerate C411 presentation description
     if (currentAnalysis) {

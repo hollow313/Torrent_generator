@@ -301,6 +301,35 @@ async def analyze_file(req: AnalyzeRequest):
     cat_name = "E-Books" if suggested_category_id == 1000 else "Films & Vidéos"
     namer_res = ReleaseNamer.format_c411_title(raw_name, media_info, category=cat_name, release_mode=effective_mode)
 
+    # 2b. Automatic TMDB lookup for official French title & metadata (C411 strict requirement)
+    tmdb_match = None
+    cfg = get_config()
+    if cfg.tmdb_api_key and is_video:
+        try:
+            tmdb_client = TmdbClient(api_key=cfg.tmdb_api_key)
+            m_type = "tv" if suggested_category_id == 5000 or "/series/" in lower_path else "movie"
+            search_query = namer_res.get("clean_title") or raw_name
+            search_query = search_query.replace(".", " ")
+            year_to_search = namer_res.get("year") or None
+            
+            search_results = await tmdb_client.search(query=search_query, year=year_to_search, media_type=m_type)
+            if search_results:
+                best = search_results[0]
+                details = await tmdb_client.get_details(best["id"], media_type=m_type)
+                if details and details.get("title"):
+                    tmdb_match = details
+                    french_title = details["title"]
+                    # Re-format release name with official French title from TMDB!
+                    namer_res = ReleaseNamer.format_c411_title(
+                        raw_name,
+                        media_info,
+                        category=cat_name,
+                        release_mode=effective_mode,
+                        custom_title=french_title
+                    )
+        except Exception as te:
+            print(f"[Analyze] Automatic TMDB lookup exception: {te}")
+
     # 3. Piece size calculation
     total_bytes = media_info.get("file_size", 0)
     suggested_piece_size = calculate_c411_piece_size(total_bytes)
@@ -319,6 +348,7 @@ async def analyze_file(req: AnalyzeRequest):
         media_info=media_info,
         source=namer_res["source"],
         tag=namer_res["final_tag"],
+        tmdb_data=tmdb_match,
         nfo_text=default_nfo
     )
 
@@ -328,6 +358,7 @@ async def analyze_file(req: AnalyzeRequest):
         "suggested_piece_size": suggested_piece_size,
         "suggested_category_id": suggested_category_id,
         "suggested_release_mode": suggested_mode,
+        "tmdb_data": tmdb_match,
         "nfo": default_nfo,
         "bbcode": default_bbcode
     }

@@ -23,6 +23,25 @@ def safe_float(val: Any, default: float = 0.0) -> float:
     except Exception:
         return default
 
+def parse_bitrate_kbps(val: Any) -> int:
+    """Parses various bitrate string representations into an integer kb/s."""
+    if not val:
+        return 0
+    s = str(val).replace('\xa0', ' ').replace(' ', '').lower()
+    m_mb = re.search(r'([\d\.]+)\s*(?:mb/s|mbps)', s)
+    if m_mb:
+        return int(float(m_mb.group(1)) * 1000)
+    m_kb = re.search(r'([\d\.]+)\s*(?:kb/s|kbps)', s)
+    if m_kb:
+        return int(float(m_kb.group(1)))
+    digits = re.sub(r'[^\d]', '', s)
+    if digits:
+        n = int(digits)
+        if n > 100_000:
+            return n // 1000
+        return n
+    return 0
+
 class MediaAnalyzer:
     @classmethod
     def get_mediainfo_cmd(cls) -> Optional[str]:
@@ -208,12 +227,20 @@ class MediaAnalyzer:
             video_codec = "XviD"
 
         # Video Bitrate
-        v_bitrate = main_video.get("BitRate_String") or main_video.get("BitRate")
-        if not v_bitrate:
-            v_bitrate = general.get("OverallBitRate_String") or general.get("OverallBitRate")
-        if v_bitrate:
-            if str(v_bitrate).isdigit():
-                v_bitrate = f"{int(v_bitrate) // 1000} kb/s"
+        v_bitrate_raw = main_video.get("BitRate") or general.get("OverallBitRate")
+        v_bitrate_str = main_video.get("BitRate_String") or general.get("OverallBitRate_String")
+        
+        v_bitrate_kbps = 0
+        if v_bitrate_raw and str(v_bitrate_raw).isdigit():
+            n = int(v_bitrate_raw)
+            v_bitrate_kbps = n // 1000 if n > 100000 else n
+        elif v_bitrate_str:
+            v_bitrate_kbps = parse_bitrate_kbps(v_bitrate_str)
+
+        if v_bitrate_kbps > 0:
+            v_bitrate = f"{v_bitrate_kbps:,} kb/s".replace(",", " ")
+        elif v_bitrate_str:
+            v_bitrate = str(v_bitrate_str)
         else:
             v_bitrate = ""
 
@@ -399,6 +426,7 @@ class MediaAnalyzer:
             "video_codec": video_codec,
             "video_format": video_format,
             "video_bitrate": v_bitrate,
+            "video_bitrate_kbps": v_bitrate_kbps,
             "frame_rate": main_video.get("FrameRate", ""),
             "hdr_tags": hdr_tags,
             "audio_tracks": audio_details,
@@ -467,6 +495,9 @@ class MediaAnalyzer:
         elif "av1" in v_fmt.lower(): v_codec = "AV1"
 
         v_bitrate = vid.get("Bit rate") or gen.get("Overall bit rate") or ""
+        v_bitrate_kbps = parse_bitrate_kbps(v_bitrate)
+        if v_bitrate_kbps > 0:
+            v_bitrate = f"{v_bitrate_kbps:,} kb/s".replace(",", " ")
 
         # Audios
         audios_list = []
@@ -530,6 +561,7 @@ class MediaAnalyzer:
             "video_codec": v_codec,
             "video_format": v_fmt,
             "video_bitrate": v_bitrate,
+            "video_bitrate_kbps": v_bitrate_kbps,
             "frame_rate": vid.get("Frame rate", "24.000 FPS"),
             "hdr_tags": [],
             "audio_tracks": audios_list,
@@ -581,6 +613,7 @@ class MediaAnalyzer:
             "video_codec": "x264",
             "video_format": "AVC",
             "video_bitrate": "4 500 kb/s",
+            "video_bitrate_kbps": 4500,
             "frame_rate": "24.000",
             "hdr_tags": [],
             "audio_tracks": audio_tracks,

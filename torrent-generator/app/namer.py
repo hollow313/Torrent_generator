@@ -22,7 +22,7 @@ class ReleaseNamer:
 
     @classmethod
     def clean_title(cls, text: str) -> str:
-        """Removes accents, replaces spaces and underscores with dots, cleans illegal characters."""
+        """Removes accents, replaces spaces and underscores with dots, cleans illegal characters, and capitalizes words in Title Case."""
         # Unidecode accents (e.g. "é" -> "e", "œ" -> "oe")
         ascii_text = unidecode(text)
         # Replace spaces, dashes (except team dash), underscores with dots
@@ -31,7 +31,36 @@ class ReleaseNamer:
         cleaned = re.sub(r"[^\w\.]", "", cleaned)
         # Collapse multiple dots
         cleaned = re.sub(r"\.+", ".", cleaned).strip(".")
-        return cleaned
+        # Capitalize each word token (Title Case) as expected by scene / C411 rules (e.g. Dune.Premiere.Partie)
+        words = []
+        for w in cleaned.split("."):
+            if not w:
+                continue
+            if w.isupper() and len(w) <= 4:
+                words.append(w)
+            else:
+                words.append(w.capitalize())
+        return ".".join(words)
+
+    @staticmethod
+    def parse_bitrate_kbps(val: Any) -> int:
+        """Extracts bitrate in kb/s from various string formats (e.g. '4 000 kb/s', '4 Mbps')."""
+        if not val:
+            return 0
+        s = str(val).replace('\xa0', ' ').replace(' ', '').lower()
+        m_mb = re.search(r'([\d\.]+)\s*(?:mb/s|mbps)', s)
+        if m_mb:
+            return int(float(m_mb.group(1)) * 1000)
+        m_kb = re.search(r'([\d\.]+)\s*(?:kb/s|kbps)', s)
+        if m_kb:
+            return int(float(m_kb.group(1)))
+        digits = re.sub(r'[^\d]', '', s)
+        if digits:
+            n = int(digits)
+            if n > 100_000:
+                return n // 1000
+            return n
+        return 0
 
     @classmethod
     def extract_existing_tag(cls, filename: str) -> Tuple[Optional[str], str]:
@@ -63,6 +92,8 @@ class ReleaseNamer:
         custom_source: Optional[str] = None,
         custom_lang: Optional[str] = None,
         custom_tag: Optional[str] = None,
+        custom_title: Optional[str] = None,
+        custom_light_tag: Optional[str] = None,
         release_mode: str = "single"  # single, episode, season_pack, integrale, manga_pack
     ) -> Dict[str, Any]:
         """
@@ -203,6 +234,45 @@ class ReleaseNamer:
             elif lang_tag == "MULTI":
                 lang_tag = "VFF"
 
+        # Light marker detection (C411 Rule: BluRay 1080p x264 < 8000 kb/s must indicate HDLight)
+        light_marker = None
+        if custom_light_tag:
+            light_marker = None if custom_light_tag.lower() in ["none", "aucun", "sans", "auto"] else custom_light_tag
+
+        if not light_marker and (not custom_light_tag or custom_light_tag.lower() == "auto"):
+            raw_lower = raw_name.lower()
+            if "hdlight" in raw_lower:
+                light_marker = "HDLight"
+            elif re.search(r"\bmhd\b", raw_lower):
+                light_marker = "mHD"
+            elif "4klight" in raw_lower or "uhdlight" in raw_lower:
+                light_marker = "4KLight"
+            else:
+                bitrate_kbps = media_info.get("video_bitrate_kbps", 0)
+                if not bitrate_kbps and media_info.get("video_bitrate"):
+                    bitrate_kbps = cls.parse_bitrate_kbps(media_info["video_bitrate"])
+                
+                is_bluray = any(b in (source or "").upper() for b in ["BLURAY", "BDRIP", "BRRIP"])
+                if is_bluray and bitrate_kbps > 0:
+                    v_codec_upper = (video_codec or "").upper()
+                    res_upper = (resolution or "").upper()
+                    
+                    if "1080" in res_upper:
+                        if any(c in v_codec_upper for c in ["X264", "H264", "AVC"]):
+                            # C411 Rule: BluRay 1080p x264 < 8000 kb/s requires HDLight
+                            if bitrate_kbps < 8000:
+                                light_marker = "HDLight"
+                        elif any(c in v_codec_upper for c in ["X265", "H265", "HEVC"]):
+                            # BluRay 1080p x265 < 5000 kb/s requires HDLight
+                            if bitrate_kbps < 5000:
+                                light_marker = "HDLight"
+                    elif "720" in res_upper:
+                        if bitrate_kbps < 4000:
+                            light_marker = "HDLight"
+                    elif "2160" in res_upper or "4K" in res_upper:
+                        if bitrate_kbps < 18000:
+                            light_marker = "4KLight"
+
         # Detect Season / Episode / Tome tokens (e.g. S01E05, S01, E1050, T01, T01-T20)
         se_match = re.search(r"\b(S\d{1,2}E\d{1,4})\b", raw_name, re.IGNORECASE)
         s_match = re.search(r"\b(S\d{1,2})\b", raw_name, re.IGNORECASE)
@@ -215,24 +285,27 @@ class ReleaseNamer:
         if not s_match and media_info.get("embedded_title"):
             s_match = re.search(r"\b(S\d{1,2})\b", media_info["embedded_title"], re.IGNORECASE)
 
-        # Clean title base (strip SxxExx, year, qualities, codecs)
-        title_clean = base_name
-        # Remove SxxExx, Sxx, Exx, Txx, INTEGRALE from title base
-        title_clean = re.sub(r"\b(S\d{1,2}E\d{1,4}|S\d{1,2}|E\d{1,4}|Ep\d{1,4}|Episode[\s\.]*\d+|T\d{1,3}|Tome[\s\.]*\d+|INTEGRALE)\b", "", title_clean, flags=re.IGNORECASE)
-        
-        # If year is in title base, cleanly isolate the movie/series title before the year
-        if year and re.search(rf"\b{re.escape(year)}\b", title_clean):
-            title_clean = re.split(rf"[\(\[\{{]?\s*{re.escape(year)}\b", title_clean)[0]
-        
-        # Remove leftover bracket/parenthesis delimiters
-        title_clean = re.sub(r"[\(\[\{\)\]\}]+", " ", title_clean)
+        # Title determination: priority to official French TMDB title if provided!
+        if custom_title:
+            title_part = cls.clean_title(custom_title)
+        else:
+            title_clean = base_name
+            # Remove SxxExx, Sxx, Exx, Txx, INTEGRALE from title base
+            title_clean = re.sub(r"\b(S\d{1,2}E\d{1,4}|S\d{1,2}|E\d{1,4}|Ep\d{1,4}|Episode[\s\.]*\d+|T\d{1,3}|Tome[\s\.]*\d+|INTEGRALE)\b", "", title_clean, flags=re.IGNORECASE)
+            
+            # If year is in title base, cleanly isolate the movie/series title before the year
+            if year and re.search(rf"\b{re.escape(year)}\b", title_clean):
+                title_clean = re.split(rf"[\(\[\{{]?\s*{re.escape(year)}\b", title_clean)[0]
+            
+            # Remove leftover bracket/parenthesis delimiters
+            title_clean = re.sub(r"[\(\[\{\)\]\}]+", " ", title_clean)
 
-        # Strip common trailing tags/qualities from title_clean
-        title_clean = re.sub(r"\b(2160p|1080p|720p|576p|480p|BluRay|BDRip|BRRip|WEB-DL|WEBDL|WEBRip|WEB|HDTV|DVDRip|REMUX|x264|x265|HEVC|AVC|AAC|AC3|EAC3|DTS|MULTI|VFF|VF2|VFQ|VFI|VOSTFR|TRUEFRENCH|FRENCH)\b.*$", "", title_clean, flags=re.IGNORECASE)
+            # Strip common trailing tags/qualities from title_clean
+            title_clean = re.sub(r"\b(2160p|1080p|720p|576p|480p|BluRay|BDRip|BRRip|WEB-DL|WEBDL|WEBRip|WEB|HDTV|DVDRip|REMUX|x264|x265|HEVC|AVC|AAC|AC3|EAC3|DTS|MULTI|VFF|VF2|VFQ|VFI|VOSTFR|TRUEFRENCH|FRENCH)\b.*$", "", title_clean, flags=re.IGNORECASE)
 
-        title_part = cls.clean_title(title_clean)
-        if not title_part:
-            title_part = "Release"
+            title_part = cls.clean_title(title_clean)
+            if not title_part:
+                title_part = "Release"
 
         # Construct final title based on C411 category & mode schema:
         parts = [title_part]
@@ -286,6 +359,8 @@ class ReleaseNamer:
                 parts.append(resolution)
             if source:
                 parts.append(source)
+            if light_marker:
+                parts.append(light_marker)
             if hdr_str:
                 parts.append(hdr_str)
             if audio_spec:
@@ -318,7 +393,9 @@ class ReleaseNamer:
             "year": year,
             "resolution": resolution,
             "source": source,
+            "light_marker": light_marker,
             "language": lang_tag,
             "video_codec": video_codec,
-            "audio_spec": audio_spec
+            "audio_spec": audio_spec,
+            "tmdb_title_applied": bool(custom_title)
         }

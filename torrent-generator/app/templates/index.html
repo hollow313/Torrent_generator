@@ -370,6 +370,19 @@
                                         </select>
                                     </div>
                                     <div class="form-group">
+                                        <label class="form-label flex justify-between">
+                                            <span>Marqueur Light</span>
+                                            <span class="text-xs text-muted" id="badge-light-status">Règle C411</span>
+                                        </label>
+                                        <select id="select-light-marker" class="input">
+                                            <option value="auto">Auto (HDLight si BluRay &lt; 8000 kb/s)</option>
+                                            <option value="HDLight">HDLight</option>
+                                            <option value="mHD">mHD</option>
+                                            <option value="4KLight">4KLight</option>
+                                            <option value="none">Aucun (Standard)</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group" style="grid-column: span 2;">
                                         <label class="form-label">Team / Signature</label>
                                         <input type="text" id="input-team-tag" class="input" placeholder="TEAM">
                                     </div>
@@ -430,6 +443,16 @@
                                         </button>
                                     </div>
                                     <small class="form-hint">Vous pouvez coller directement l'URL d'un film/série TMDB ou son ID IMDb (ex: tt1234567).</small>
+                                    
+                                    <!-- French TMDB Title Sync Alert -->
+                                    <div class="alert alert-success mt-2 mb-2 p-2" id="alert-tmdb-fr-title" style="display: none; border-left: 4px solid #10b981;">
+                                        <div class="flex justify-between items-center text-xs">
+                                            <span><i class="fa-solid fa-language mr-1 text-primary"></i> Titre Français TMDB : <strong id="text-tmdb-fr-title">--</strong></span>
+                                            <button type="button" class="btn btn-xs btn-primary ml-2" id="btn-apply-tmdb-title">
+                                                <i class="fa-solid fa-check mr-1"></i> Appliquer au titre C411
+                                            </button>
+                                        </div>
+                                    </div>
                                     <input type="hidden" id="tmdb-id-val">
                                     <input type="hidden" id="imdb-id-val">
                                     <input type="hidden" id="poster-url-val">
